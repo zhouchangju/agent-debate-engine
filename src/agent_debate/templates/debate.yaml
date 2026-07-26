@@ -1,0 +1,85 @@
+# Agent Debate Engine configuration schema v1.
+#
+# Paths are resolved relative to this file. Models are intentionally omitted:
+# each CLI uses the model selected in its own configuration.
+schema_version: 1
+
+run:
+  output_dir: .agent-debate/runs
+  workspace: .
+  max_parallel: 2
+  stream: true
+
+agents:
+  codex_primary:
+    adapter: codex
+    command: ["codex"]
+    permission: read_only
+    extra_args: []
+    timeout: 300
+    max_output: 100000
+    retries: 0
+
+  codex_alternative:
+    adapter: codex
+    command: ["codex"]
+    permission: read_only
+    extra_args: []
+    timeout: 300
+    max_output: 100000
+    retries: 0
+
+workflow:
+  # Stages run in list order. Participants in a parallel stage start
+  # concurrently, subject to run.max_parallel, then meet at a stage barrier.
+  stages:
+    - id: proposals
+      mode: parallel
+      participants:
+        - id: architect
+          agent: codex_primary
+          prompt: prompts/architect.md
+        - id: alternative
+          agent: codex_alternative
+          prompt: prompts/alternative.md
+
+    - id: critique
+      mode: sequential
+      participants:
+        - id: critic
+          agent: codex_primary
+          prompt: prompts/critic.md
+
+    - id: revision
+      mode: sequential
+      participants:
+        - id: reviewer
+          agent: codex_alternative
+          prompt: prompts/reviewer.md
+          label: Synthesis revision
+
+  judge:
+    agent: codex_primary
+    prompt: prompts/judge.md
+
+  stop:
+    # This low-cost default may finalize after one well-supported round. Raise
+    # min_rounds and stable_rounds when independent confirmation matters more
+    # than latency and model cost.
+    min_rounds: 1
+    max_rounds: 3
+    confidence_threshold: 0.85
+    stable_rounds: 1
+    max_elapsed_seconds: 1800
+
+context:
+  max_prompt_chars: 24000
+  max_requirement_chars: 8000
+  max_response_chars: 8000
+  keep_recent_rounds: 2
+
+failure:
+  on_agent_error: abort
+  on_judge_error: retry
+  require_all_participants: true
+  schema_repair_attempts: 1

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-debate-engine.local/schemas/judge-v1.json",
+  "title": "Agent Debate Judge Decision v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "verdict",
+    "confidence",
+    "rationale",
+    "synthesis",
+    "accepted_decisions",
+    "rejected_options",
+    "unresolved_issues",
+    "next_round_focus"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "verdict": {
+      "enum": ["continue", "finalize", "blocked"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "synthesis": {
+      "type": "string",
+      "minLength": 1
+    },
+    "accepted_decisions": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "rejected_options": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "unresolved_issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "summary"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "severity": {"enum": ["critical", "major", "minor"]},
+          "summary": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "next_round_focus": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  }
+}
