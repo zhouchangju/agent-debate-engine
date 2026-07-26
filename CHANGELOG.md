@@ -5,6 +5,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Versioned `agent-debate` Skill for natural-language technical reviews, previews, and resume.
+- Safe `quick`, `standard`, and `deep` technical-review presets for embedding callers.
+- A structured JSON Skill runner with request-owned artifact roots and actionable failure output.
+
 ## [0.1.0] - 2026-07-26
 
 ### Added

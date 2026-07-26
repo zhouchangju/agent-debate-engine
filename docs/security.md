@@ -4,6 +4,18 @@ Agent Debate Engine reduces execution risk; it does not make arbitrary agent CLI
 or repositories trustworthy. Its safest built-in configuration is a text-only architecture debate
 using Codex `read_only` profiles in a dedicated, non-sensitive workspace.
 
+## Natural-language Skill boundary
+
+The bundled Skill narrows the engine rather than widening it. Its machine runner constructs only
+the versioned read-only Codex technical-review preset and has no option for `--allow-unsafe`,
+Kimi, Generic adapters, or write-capable permissions. Task text is passed through a bounded UTF-8
+file instead of process argv. Every Skill request receives a unique artifact root, so failure
+reporting never guesses among concurrent runs.
+
+Explicit natural-language multi-agent execution authorizes provider calls for this safe preset.
+An ordinary single-agent analysis request does not. Preview mode reports the planned agents,
+stages, permissions, and budgets without invoking a provider.
+
 ## Trust boundaries
 
 | Input or component | Trust assumption |

@@ -47,6 +47,35 @@ CLI uses its configured default. Every run receives a collision-safe directory b
 `.agent-debate/runs/`. Initialization never follows a symbolic link in the destination path: the
 destination and every existing ancestor must be real directories.
 
+## Natural-language Skill
+
+The versioned Skill in `skills/agent-debate/` turns the safe technical-review workflow into a
+natural-language interface. Install it once by linking the repository copy into the global Skill
+directory:
+
+```bash
+ln -s \
+  "$(pwd)/skills/agent-debate" \
+  ~/.agents/skills/agent-debate
+```
+
+Then ask Codex naturally:
+
+```text
+Use agent-debate to review whether this repository should migrate from SQLite
+to PostgreSQL. Focus on recovery risk and operational cost, standard depth.
+```
+
+The Skill selects the current workspace, writes a bounded task file, invokes the read-only Codex
+preset through a JSON runner, and returns the synthesis, terminal status, unresolved issues, and
+exact audit path. `quick`, `standard`, and `deep` map to bounded one-, three-, and five-round
+budgets. A request for a preview uses `plan` and makes no provider calls.
+
+The Skill deliberately cannot enable Kimi, Generic commands, write access, or
+`danger_full_access`. Those modes remain available only through an explicit YAML configuration,
+runtime acknowledgement, and external containment. Ordinary analysis requests without clear
+multi-agent intent do not silently spend provider tokens.
+
 ## How a debate runs
 
 ```text

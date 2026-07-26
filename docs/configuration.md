@@ -5,6 +5,30 @@ prompts; `agent-debate validate --config PATH` checks the file without calling a
 
 Version 0.1 officially supports POSIX platforms (Linux and macOS). Windows is not supported.
 
+## Safe embedded preset
+
+Natural-language integrations can use
+`agent_debate.presets.build_technical_review_config(workspace, depth=...)` instead of generating
+YAML. The preset is intentionally closed:
+
+- two Codex roles;
+- `read_only` permission and denied approvals;
+- parallel primary and alternative proposals;
+- sequential critique and revision;
+- one structured Judge;
+- no Kimi, Generic adapter, extra provider argv, or unsafe acknowledgement.
+
+Depth controls only bounded deliberation:
+
+| Depth | Minimum rounds | Maximum rounds | Stable decisions | Time budget |
+|---|---:|---:|---:|---:|
+| `quick` | 1 | 1 | 1 | 300 seconds |
+| `standard` | 1 | 3 | 1 | 900 seconds |
+| `deep` | 2 | 5 | 2 | 1,800 seconds |
+
+The bundled Skill uses a unique output root per request, which lets an error response identify the
+request-owned run without selecting a potentially unrelated "newest" directory.
+
 Unknown keys are rejected. Relative paths are resolved against the directory containing the YAML,
 not the caller's current directory. This applies to the workspace, output directory, participant
 prompts, and Judge prompt.

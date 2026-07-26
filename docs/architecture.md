@@ -48,6 +48,18 @@ workflow order, not completion order. `run.max_parallel` is the global concurren
 
 ## Components
 
+### Natural-language control plane
+
+The repository-owned `agent-debate` Skill is a thin conversational adapter rather than a second
+orchestrator. It selects the safe technical-review preset, writes task content to a file instead of
+process argv, invokes `agent_debate.skill_runner`, and interprets one structured JSON envelope.
+The runner calls the public engine API directly, so it never parses Rich terminal text or guesses
+the newest run directory.
+
+`agent_debate.presets.build_technical_review_config()` owns the versioned default workflow used by
+the Skill. It exposes only read-only Codex roles and bounded `quick`, `standard`, and `deep`
+budgets. Custom providers and permissions stay on the explicit YAML path.
+
 ### Configuration
 
 The configuration loader validates schema v1, rejects unknown fields, resolves relative paths
