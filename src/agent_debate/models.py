@@ -161,6 +161,8 @@ class AgentRequest(StrictModel):
     timeout_seconds: FiniteFloat = Field(default=300.0, gt=0, strict=True)
     max_output_chars: int = Field(default=100_000, gt=0, strict=True)
     model: NonEmptyText | None = None
+    model_reasoning_effort: NonEmptyText | None = None
+    reasoning_effort: NonEmptyText | None = None
     permission: PermissionMode = PermissionMode.READ_ONLY
     extra_args: tuple[str, ...] = ()
 
@@ -190,6 +192,13 @@ class AgentRequest(StrictModel):
     def validate_model(cls, value: str | None) -> str | None:
         if value is not None and "\x00" in value:
             raise ValueError("model must not contain NUL")
+        return value
+
+    @field_validator("model_reasoning_effort", "reasoning_effort")
+    @classmethod
+    def validate_reasoning_effort_fields(cls, value: str | None) -> str | None:
+        if value is not None and "\x00" in value:
+            raise ValueError("reasoning effort must not contain NUL")
         return value
 
     @field_validator("extra_args")
@@ -226,6 +235,10 @@ class AgentResult(StrictModel):
     display_command: tuple[str, ...] = Field(min_length=1)
     input_hash: Sha256Hex
     output_hash: Sha256Hex
+    provider_adapter: NonEmptyText = "unknown"
+    provider_model: NonEmptyText | None = None
+    session_mode: Literal["fresh", "unverified"] = "unverified"
+    session_enforcement: NonEmptyText = "adapter did not declare session isolation"
 
     @field_validator("display_command", mode="before")
     @classmethod

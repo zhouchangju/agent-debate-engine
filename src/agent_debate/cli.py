@@ -384,6 +384,8 @@ def _render_result(result: EngineResult) -> None:
     style = "green" if result.converged else "yellow"
     console.print(f"[{style}]Run status: {result.status}[/{style}]")
     console.print(f"Artifacts: {result.run_dir}")
+    console.print(f"Machine result: {result.run_dir / 'result.json'}")
+    console.print(f"Complete evidence: {result.run_dir / 'evidence.md'}")
     console.print(f"Stop reason: {result.stop_reason}")
     exit_codes = {
         StopOutcome.EXHAUSTED.value: _EXIT_EXHAUSTED,

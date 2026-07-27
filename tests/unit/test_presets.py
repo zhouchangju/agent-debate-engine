@@ -41,6 +41,7 @@ def test_technical_review_depths_are_bounded_and_safe(
     ]
     assert all(agent.adapter is AgentAdapter.CODEX for agent in config.agents.values())
     assert all(agent.permission is PermissionMode.READ_ONLY for agent in config.agents.values())
+    assert all(agent.model_reasoning_effort == "medium" for agent in config.agents.values())
     assert all(
         participant.prompt.is_file()
         for stage in config.workflow.stages

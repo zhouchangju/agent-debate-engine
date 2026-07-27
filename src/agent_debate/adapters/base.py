@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 PermissionMode = Literal["read_only", "workspace_write", "danger_full_access"]
 PromptTransport = Literal["stdin", "argument", "flag"]
 StreamName = Literal["stdout", "stderr"]
+SessionMode = Literal["fresh", "unverified"]
 StreamCallback = Callable[[StreamName, str], Awaitable[None] | None]
 
 REDACTED_PROMPT = "<prompt:redacted>"
@@ -99,6 +100,12 @@ class AgentRequestLike(Protocol):
     def model(self) -> str | None: ...
 
     @property
+    def model_reasoning_effort(self) -> str | None: ...
+
+    @property
+    def reasoning_effort(self) -> str | None: ...
+
+    @property
     def extra_args(self) -> tuple[str, ...]: ...
 
     @property
@@ -120,6 +127,12 @@ class AgentConfigLike(Protocol):
 
     @property
     def model(self) -> str | None: ...
+
+    @property
+    def model_reasoning_effort(self) -> str | None: ...
+
+    @property
+    def reasoning_effort(self) -> str | None: ...
 
     @property
     def permission(self) -> object: ...
@@ -153,6 +166,10 @@ class CommandSpec:
     terminate_grace_seconds: float = 2.0
     final_output_path: Path | None = None
     env: Mapping[str, str] | None = None
+    provider_adapter: str = "unknown"
+    provider_model: str | None = None
+    session_mode: SessionMode = "unverified"
+    session_enforcement: str = "adapter does not declare a fresh-session contract"
 
     def __post_init__(self) -> None:
         if not self.argv:
@@ -174,6 +191,14 @@ class CommandSpec:
             raise ConfigError("max_output_chars must be a positive integer")
         if not math.isfinite(self.terminate_grace_seconds) or self.terminate_grace_seconds < 0:
             raise ConfigError("terminate_grace_seconds must be finite and non-negative")
+        if not self.provider_adapter or "\x00" in self.provider_adapter:
+            raise ConfigError("provider_adapter must be non-empty and NUL-free")
+        if self.provider_model is not None and "\x00" in self.provider_model:
+            raise ConfigError("provider_model must be NUL-free")
+        if self.session_mode not in ("fresh", "unverified"):
+            raise ConfigError("session_mode must be fresh or unverified")
+        if not self.session_enforcement or "\x00" in self.session_enforcement:
+            raise ConfigError("session_enforcement must be non-empty and NUL-free")
 
     @property
     def command(self) -> tuple[str, ...]:
@@ -482,6 +507,30 @@ def request_model(
     if model is None and agent_config is not None:
         model = getattr(agent_config, "model", None)
     return str(model) if model is not None else None
+
+
+def request_model_reasoning_effort(
+    request: AgentRequestLike,
+    agent_config: AgentConfigLike | None,
+) -> str | None:
+    """Resolve an optional provider-specific model reasoning effort."""
+
+    effort = getattr(request, "model_reasoning_effort", None)
+    if effort is None and agent_config is not None:
+        effort = getattr(agent_config, "model_reasoning_effort", None)
+    return str(effort) if effort is not None else None
+
+
+def request_reasoning_effort(
+    request: AgentRequestLike,
+    agent_config: AgentConfigLike | None,
+) -> str | None:
+    """Resolve an optional general reasoning effort alias."""
+
+    effort = getattr(request, "reasoning_effort", None)
+    if effort is None and agent_config is not None:
+        effort = getattr(agent_config, "reasoning_effort", None)
+    return str(effort) if effort is not None else None
 
 
 def request_extra_args(

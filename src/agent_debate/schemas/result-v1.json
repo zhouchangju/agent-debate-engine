@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-debate-engine.local/schemas/result-v1.json",
+  "title": "Agent Debate Result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run",
+    "request",
+    "summary",
+    "roles",
+    "rounds",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "status",
+        "round_count",
+        "invocation_count"
+      ],
+      "properties": {
+        "id": {"type": ["string", "null"]},
+        "title": {"type": "string"},
+        "status": {"type": ["string", "null"]},
+        "outcome": {"type": ["string", "null"]},
+        "stop_reason": {"type": ["string", "null"]},
+        "round_count": {"type": "integer", "minimum": 0},
+        "invocation_count": {"type": "integer", "minimum": 0},
+        "started_at": {"type": ["string", "null"]},
+        "finished_at": {"type": ["string", "null"]},
+        "elapsed_seconds": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "request": {
+      "type": "object",
+      "required": ["markdown", "artifact"],
+      "properties": {
+        "markdown": {"type": "string"},
+        "artifact": {"type": "string"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["final_markdown", "decision"],
+      "properties": {
+        "final_markdown": {"type": "string"},
+        "decision": {"type": ["object", "null"]}
+      }
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role_id", "agent_id", "adapter", "model"]
+      }
+    },
+    "rounds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["number", "invocations", "judge"]
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "required": ["manifest", "result", "final", "evidence"]
+    }
+  }
+}

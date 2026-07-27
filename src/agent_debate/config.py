@@ -80,6 +80,7 @@ class StageMode(StrEnum):
 
     PARALLEL = "parallel"
     SEQUENTIAL = "sequential"
+    INDEPENDENT_SEQUENTIAL = "independent_sequential"
 
 
 class AgentErrorPolicy(StrEnum):
@@ -103,6 +104,8 @@ class AgentConfig(_ConfigModel):
     command: tuple[str, ...] = Field(min_length=1)
     model: NonEmptyStr | None = None
     permission: PermissionMode = PermissionMode.READ_ONLY
+    model_reasoning_effort: NonEmptyStr | None = None
+    reasoning_effort: NonEmptyStr | None = None
     extra_args: tuple[str, ...] = ()
     timeout: FiniteFloat = Field(default=300.0, gt=0, strict=True)
     max_output: int = Field(
@@ -133,6 +136,13 @@ class AgentConfig(_ConfigModel):
     def validate_nul_free_metadata(cls, value: str | None) -> str | None:
         if value is not None and "\x00" in value:
             raise ValueError("model and prompt_flag must not contain NUL")
+        return value
+
+    @field_validator("model_reasoning_effort", "reasoning_effort")
+    @classmethod
+    def validate_nul_free_reasoning(cls, value: str | None) -> str | None:
+        if value is not None and "\x00" in value:
+            raise ValueError("reasoning efforts must not contain NUL")
         return value
 
     @model_validator(mode="after")
@@ -199,7 +209,7 @@ class ParticipantConfig(_ConfigModel):
 
 
 class StageConfig(_ConfigModel):
-    """A workflow barrier containing parallel or sequential participants."""
+    """A workflow barrier containing dependent or independent participants."""
 
     id: SafeId
     mode: StageMode = StageMode.PARALLEL

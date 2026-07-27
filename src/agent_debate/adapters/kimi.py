@@ -15,6 +15,7 @@ from agent_debate.adapters.base import (
     request_max_output,
     request_model,
     request_permission,
+    request_reasoning_effort,
     request_timeout,
     request_workspace,
 )
@@ -22,6 +23,23 @@ from agent_debate.errors import AgentExecutionError, ConfigError
 
 DEFAULT_KIMI_PROMPT_MAX_BYTES = 64 * 1024
 KIMI_PROMPT_BYTE_LIMIT = DEFAULT_KIMI_PROMPT_MAX_BYTES
+DEFAULT_KIMI_MODEL = "k3"
+DEFAULT_KIMI_REASONING_EFFORT = "high"
+
+
+def _normalize_kimi_reasoning_effort(value: str) -> str:
+    """Normalize user-facing aliases to a CLI-accepted effort value."""
+
+    normalized = value.strip().lower()
+    alias = {
+        "standard": "high",
+        "advanced": "max",
+        "extreme": "max",
+        "medium": "high",
+        "minimum": "low",
+        "light": "low",
+    }
+    return alias.get(normalized, normalized)
 
 
 class PromptTooLargeError(AgentExecutionError):
@@ -86,7 +104,7 @@ class KimiAdapter(BaseAdapter):
                 "Use danger_full_access with the engine's explicit --allow-unsafe "
                 "acknowledgement, or choose Codex/generic with an external sandbox."
             )
-        model = request_model(request, agent_config)
+        model = request_model(request, agent_config) or DEFAULT_KIMI_MODEL
         extra_args = request_extra_args(request, agent_config)
         reject_provider_extra_args(extra_args, adapter_name=self.name)
 
@@ -103,6 +121,12 @@ class KimiAdapter(BaseAdapter):
         ]
         if model is not None:
             argv.extend(("--model", model))
+        reasoning_effort = request_reasoning_effort(request, agent_config)
+        if reasoning_effort is None:
+            reasoning_effort = DEFAULT_KIMI_REASONING_EFFORT
+        else:
+            reasoning_effort = _normalize_kimi_reasoning_effort(reasoning_effort)
+        env = {"KIMI_MODEL_THINKING_EFFORT": reasoning_effort} if reasoning_effort else None
 
         return CommandSpec(
             argv=tuple(argv),
@@ -111,8 +135,16 @@ class KimiAdapter(BaseAdapter):
                 redactions={2: REDACTED_PROMPT},
             ),
             cwd=workspace,
+            env=env,
             timeout_seconds=request_timeout(request, agent_config),
             max_output_chars=request_max_output(request, agent_config),
+            provider_adapter=self.name,
+            provider_model=model,
+            session_mode="fresh",
+            session_enforcement=(
+                "new Kimi prompt session; adapter forbids --session/-S and "
+                "--continue/-c"
+            ),
         )
 
 

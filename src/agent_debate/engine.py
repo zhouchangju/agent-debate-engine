@@ -59,7 +59,12 @@ from agent_debate.models import (
     PermissionMode,
 )
 from agent_debate.preflight import AgentDiagnostic, diagnose_agents, require_healthy
-from agent_debate.reporting import FinalReportData, render_final_report
+from agent_debate.reporting import (
+    FinalReportData,
+    render_evidence_report,
+    render_final_report,
+)
+from agent_debate.result_document import build_result_document
 from agent_debate.stop import StopDecision, StopOutcome, evaluate_stop
 
 StreamHandler = Callable[[str, StreamName, str], Awaitable[None] | None]
@@ -507,6 +512,44 @@ class DebateEngine:
                 (participant, task_result.result(), prompt)
                 for (participant, prompt), task_result in zip(prompts, tasks, strict=True)
             ]
+        elif stage.mode is StageMode.INDEPENDENT_SEQUENTIAL:
+            prompts = [
+                (
+                    participant,
+                    self._build_participant_prompt(
+                        task,
+                        participant,
+                        judge_state,
+                        current_round_evidence,
+                        prior_evidence,
+                    ),
+                )
+                for participant in stage.participants
+            ]
+            for participant, prompt in prompts:
+                outcome = await self._invoke_agent(
+                    store=store,
+                    round_number=round_number,
+                    stage_id=stage.id,
+                    role_id=participant.id,
+                    agent_id=participant.agent,
+                    prompt=prompt,
+                )
+                completed.append((participant, outcome, prompt))
+                if outcome.error is not None and (
+                    self.config.failure.on_agent_error is AgentErrorPolicy.ABORT
+                    or self.config.failure.require_all_participants
+                ):
+                    store.append_event(
+                        "stage_failed",
+                        {
+                            "round_number": round_number,
+                            "stage": stage.id,
+                            "participant": participant.id,
+                            "error": str(outcome.error),
+                        },
+                    )
+                    break
         else:
             sequential_evidence = list(current_round_evidence)
             for participant in stage.participants:
@@ -881,6 +924,16 @@ class DebateEngine:
             display_command=display_command,
             input_hash=content_sha256(prompt),
             output_hash=content_sha256(output_hash_source),
+            provider_adapter=(spec.provider_adapter if spec is not None else adapter.name),
+            provider_model=(
+                spec.provider_model if spec is not None else agent_config.model
+            ),
+            session_mode=(spec.session_mode if spec is not None else "unverified"),
+            session_enforcement=(
+                spec.session_enforcement
+                if spec is not None
+                else "command construction failed before session isolation was declared"
+            ),
         )
         return _InvocationOutcome(result=result, error=error)
 
@@ -937,6 +990,7 @@ class DebateEngine:
             current_round=None,
             final_decision=(decision.model_dump(mode="json") if decision else None),
         )
+        self._write_evidence_report(store)
         return EngineResult(
             run_id=store.run_id,
             run_dir=store.run_dir,
@@ -1059,6 +1113,7 @@ class DebateEngine:
                 elapsed_seconds=self._elapsed_seconds(),
                 finished_at=_utc_now().isoformat(),
             )
+            self._write_evidence_report(store)
         except DebateError:
             pass
 
@@ -1067,6 +1122,16 @@ class DebateEngine:
 
         store.update_manifest(elapsed_seconds=self._elapsed_seconds())
         store.record_failure(error)
+        self._write_evidence_report(store)
+
+    @staticmethod
+    def _write_evidence_report(store: ArtifactStore) -> None:
+        manifest = store.manifest
+        document = build_result_document(manifest, store.read_artifact_text)
+        store.write_result(document)
+        manifest = store.manifest
+        report = render_evidence_report(manifest, store.read_artifact_text)
+        store.write_evidence(report)
 
 
 async def run_debate(

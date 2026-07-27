@@ -86,6 +86,9 @@ def test_agent_request_is_strict_and_json_serializable(tmp_path: Path) -> None:
     dumped = request.model_dump(mode="json")
     assert dumped["cwd"] == str(tmp_path)
     assert dumped["permission"] == "read_only"
+    assert "model_reasoning_effort" in dumped
+    assert dumped["model_reasoning_effort"] is None
+    assert "reasoning_effort" in dumped
     assert dumped["prompt"].endswith("\n")
 
     with pytest.raises(ValidationError, match="extra_forbidden"):
@@ -117,6 +120,8 @@ def test_agent_request_rejects_coerced_schema_versions(
         {"timeout_seconds": 0},
         {"max_output_chars": 0},
         {"round_number": 0},
+        {"model_reasoning_effort": "bad\x00effort"},
+        {"reasoning_effort": "\x00"},
     ],
 )
 def test_agent_request_rejects_invalid_semantics(tmp_path: Path, updates: dict[str, Any]) -> None:

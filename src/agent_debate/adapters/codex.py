@@ -13,11 +13,15 @@ from agent_debate.adapters.base import (
     request_extra_args,
     request_max_output,
     request_model,
+    request_model_reasoning_effort,
     request_optional_path,
     request_permission,
     request_timeout,
     request_workspace,
 )
+
+DEFAULT_CODEX_MODEL = "gpt-5.6-sol"
+DEFAULT_CODEX_MODEL_REASONING_EFFORT = "medium"
 
 _CODEX_SANDBOX = {
     "read_only": "read-only",
@@ -38,7 +42,11 @@ class CodexAdapter(BaseAdapter):
     ) -> CommandSpec:
         workspace = request_workspace(request)
         permission = request_permission(request, agent_config)
-        model = request_model(request, agent_config)
+        model = request_model(request, agent_config) or DEFAULT_CODEX_MODEL
+        model_reasoning_effort = (
+            request_model_reasoning_effort(request, agent_config)
+            or DEFAULT_CODEX_MODEL_REASONING_EFFORT
+        )
         extra_args = request_extra_args(request, agent_config)
         reject_provider_extra_args(extra_args, adapter_name=self.name)
 
@@ -57,6 +65,8 @@ class CodexAdapter(BaseAdapter):
         ]
         if model is not None:
             argv.extend(("--model", model))
+        if model_reasoning_effort is not None:
+            argv.extend(("--config", f"model_reasoning_effort={model_reasoning_effort}"))
 
         argv.extend(
             (
@@ -94,6 +104,13 @@ class CodexAdapter(BaseAdapter):
             timeout_seconds=request_timeout(request, agent_config),
             max_output_chars=request_max_output(request, agent_config),
             final_output_path=final_output_path,
+            provider_adapter=self.name,
+            provider_model=model,
+            session_mode="fresh",
+            session_enforcement=(
+                "codex exec --ephemeral; provider session files are not persisted "
+                "or resumed"
+            ),
         )
 
 

@@ -20,7 +20,8 @@ def test_initialize_project_writes_self_contained_starter(tmp_path: Path) -> Non
     assert stat.S_IMODE((tmp_path / "prompts").stat().st_mode) == 0o755
     config = (tmp_path / "debate.yaml").read_text(encoding="utf-8")
     assert "permission: read_only" in config
-    assert "model:" not in config
+    assert "model: gpt-5.6-sol" in config
+    assert "model_reasoning_effort: medium" in config
 
 
 def test_initialize_project_refuses_partial_overwrite(tmp_path: Path) -> None:

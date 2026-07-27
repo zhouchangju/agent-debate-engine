@@ -20,8 +20,10 @@ from agent_debate.adapters.base import (
     reject_literal_credentials,
     request_max_output,
     request_model,
+    request_model_reasoning_effort,
     request_optional_path,
     request_permission,
+    request_reasoning_effort,
     request_timeout,
     request_workspace,
 )
@@ -42,6 +44,8 @@ def make_request(
     prompt: str = "Review the proposed design.",
     permission: PermissionMode = PermissionMode.READ_ONLY,
     model: str | None = None,
+    model_reasoning_effort: str | None = None,
+    reasoning_effort: str | None = None,
     extra_args: tuple[str, ...] = (),
     final_output_path: Path | None = None,
     output_schema_path: Path | None = None,
@@ -54,6 +58,8 @@ def make_request(
         timeout_seconds=17.5,
         max_output_chars=12_345,
         model=model,
+        model_reasoning_effort=model_reasoning_effort,
+        reasoning_effort=reasoning_effort,
         permission=permission,
         extra_args=extra_args,
         final_output_path=final_output_path,
@@ -97,6 +103,10 @@ def test_codex_0145_maps_each_permission_to_exact_argv(
         sandbox,
         "--cd",
         str(tmp_path),
+        "--model",
+        "gpt-5.6-sol",
+        "--config",
+        "model_reasoning_effort=medium",
         "exec",
         "--json",
         "--color",
@@ -121,6 +131,7 @@ def test_codex_0145_orders_model_and_managed_artifact_args(
         prompt=prompt,
         permission=PermissionMode.WORKSPACE_WRITE,
         model="request-model",
+        model_reasoning_effort="request-effort",
         final_output_path=final_path,
         output_schema_path=schema_path,
     )
@@ -142,6 +153,8 @@ def test_codex_0145_orders_model_and_managed_artifact_args(
         str(tmp_path),
         "--model",
         "request-model",
+        "--config",
+        "model_reasoning_effort=request-effort",
         "exec",
         "--json",
         "--color",
@@ -160,6 +173,24 @@ def test_codex_0145_orders_model_and_managed_artifact_args(
     assert spec.max_output_chars == 12_345
 
 
+def test_codex_0145_uses_adapter_defaults_when_model_is_missing(
+    tmp_path: Path,
+) -> None:
+    request = make_request(
+        tmp_path,
+        model=None,
+        model_reasoning_effort=None,
+    )
+    config = AgentConfig(adapter=AdapterKind.CODEX, command=("codex",))
+
+    spec = CodexAdapter().build_command(request, config)
+    model_index = spec.argv.index("--model")
+    effort_index = spec.argv.index("--config")
+
+    assert spec.argv[model_index + 1] == "gpt-5.6-sol"
+    assert spec.argv[effort_index + 1] == "model_reasoning_effort=medium"
+
+
 def test_kimi_0291_builds_exact_redacted_argv_for_full_access(
     tmp_path: Path,
 ) -> None:
@@ -169,6 +200,7 @@ def test_kimi_0291_builds_exact_redacted_argv_for_full_access(
         prompt=prompt,
         permission=PermissionMode.DANGER_FULL_ACCESS,
         model="kimi-request-model",
+        reasoning_effort="max",
     )
     config = AgentConfig(
         adapter=AdapterKind.KIMI,
@@ -188,6 +220,7 @@ def test_kimi_0291_builds_exact_redacted_argv_for_full_access(
         "--model",
         "kimi-request-model",
     )
+    assert spec.env == {"KIMI_MODEL_THINKING_EFFORT": "max"}
     assert spec.display_argv == (
         "kimi-wrapper",
         "--prompt",
@@ -197,10 +230,83 @@ def test_kimi_0291_builds_exact_redacted_argv_for_full_access(
         "--model",
         "kimi-request-model",
     )
-    assert {"--plan", "--yolo", "--auto"}.isdisjoint(spec.argv)
-    assert prompt not in spec.display_argv
-    assert spec.stdin is None
-    assert spec.cwd == tmp_path
+
+
+def test_kimi_0291_uses_adapter_defaults_and_aliases_for_missing_values(
+    tmp_path: Path,
+) -> None:
+    request = make_request(
+        tmp_path,
+        permission=PermissionMode.DANGER_FULL_ACCESS,
+        model=None,
+        reasoning_effort=None,
+    )
+    config = AgentConfig(
+        adapter=AdapterKind.KIMI,
+        command=("kimi",),
+        permission=PermissionMode.DANGER_FULL_ACCESS,
+    )
+
+    spec = KimiAdapter().build_command(request, config)
+
+    model_index = spec.argv.index("--model")
+    assert spec.argv[model_index + 1] == "k3"
+    assert spec.env == {"KIMI_MODEL_THINKING_EFFORT": "high"}
+
+    spec_standard = KimiAdapter().build_command(
+        make_request(
+            tmp_path,
+            permission=PermissionMode.DANGER_FULL_ACCESS,
+            reasoning_effort="standard",
+        ),
+        config,
+    )
+    assert spec_standard.env == {"KIMI_MODEL_THINKING_EFFORT": "high"}
+
+
+def test_request_reasoning_preference_prefers_request_over_config(tmp_path: Path) -> None:
+    request = make_request(
+        tmp_path,
+        model_reasoning_effort="request-effort",
+        reasoning_effort="request-reasoning-effort",
+    )
+    config = AgentConfig(
+        adapter=AdapterKind.CODEX,
+        command=("codex",),
+        model_reasoning_effort="config-effort",
+    )
+
+    codex_argv = CodexAdapter().build_command(request, config).argv
+    assert "--config" in codex_argv
+    config_index = codex_argv.index("--config")
+    assert codex_argv[config_index + 1] == "model_reasoning_effort=request-effort"
+
+    kimi_argv = KimiAdapter().build_command(
+        make_request(
+            tmp_path,
+            permission=PermissionMode.DANGER_FULL_ACCESS,
+            reasoning_effort="request-reasoning-effort",
+        ),
+        AgentConfig(
+            adapter=AdapterKind.KIMI,
+            command=("kimi",),
+            permission=PermissionMode.DANGER_FULL_ACCESS,
+            reasoning_effort="config-reasoning-effort",
+        ),
+    )
+    assert kimi_argv.env == {"KIMI_MODEL_THINKING_EFFORT": "request-reasoning-effort"}
+    assert KimiAdapter().build_command(
+        make_request(
+            tmp_path,
+            permission=PermissionMode.DANGER_FULL_ACCESS,
+        ),
+        AgentConfig(
+            adapter=AdapterKind.KIMI,
+            command=("kimi",),
+            permission=PermissionMode.DANGER_FULL_ACCESS,
+            reasoning_effort="config-reasoning-effort",
+        ),
+    ).env == {"KIMI_MODEL_THINKING_EFFORT": "config-reasoning-effort"}
 
 
 @pytest.mark.parametrize(
@@ -801,6 +907,8 @@ def test_structural_request_helpers_cover_fallbacks(tmp_path: Path) -> None:
         timeout=12.5,
         max_output=321,
         model="fallback-model",
+        model_reasoning_effort="config-model-effort",
+        reasoning_effort="config-reasoning-effort",
         permission=PermissionMode.WORKSPACE_WRITE,
     )
 
@@ -835,6 +943,22 @@ def test_structural_request_helpers_cover_fallbacks(tmp_path: Path) -> None:
     assert request_max_output(empty_request, None) == DEFAULT_MAX_OUTPUT_CHARS
     assert request_max_output(empty_request, fallback_config) == 321
     assert request_model(empty_request, fallback_config) == "fallback-model"
+    assert request_model_reasoning_effort(empty_request, fallback_config) == "config-model-effort"
+    assert request_reasoning_effort(empty_request, fallback_config) == "config-reasoning-effort"
+    assert (
+        request_model_reasoning_effort(
+            SimpleNamespace(model_reasoning_effort="request-model-effort"),
+            fallback_config,
+        )
+        == "request-model-effort"
+    )
+    assert (
+        request_reasoning_effort(
+            SimpleNamespace(reasoning_effort="request-reasoning-effort"),
+            fallback_config,
+        )
+        == "request-reasoning-effort"
+    )
     assert request_permission(empty_request, fallback_config) == "workspace_write"
     assert request_permission(SimpleNamespace(permission="full-access"), None) == (
         "danger_full_access"

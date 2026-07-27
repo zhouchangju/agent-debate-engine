@@ -1,7 +1,7 @@
 # Agent Debate Engine configuration schema v1.
 #
-# Paths are resolved relative to this file. Models are intentionally omitted:
-# each CLI uses the model selected in its own configuration.
+# Paths are resolved relative to this file. The bundled Codex preset sets
+# `model: gpt-5.6-sol` and `model_reasoning_effort: medium` for both default Codex profiles.
 schema_version: 1
 
 run:
@@ -14,6 +14,8 @@ agents:
   codex_primary:
     adapter: codex
     command: ["codex"]
+    model: gpt-5.6-sol
+    model_reasoning_effort: medium
     permission: read_only
     extra_args: []
     timeout: 300
@@ -23,6 +25,8 @@ agents:
   codex_alternative:
     adapter: codex
     command: ["codex"]
+    model: gpt-5.6-sol
+    model_reasoning_effort: medium
     permission: read_only
     extra_args: []
     timeout: 300

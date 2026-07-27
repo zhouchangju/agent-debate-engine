@@ -54,6 +54,10 @@ _DEPTH_SETTINGS = {
 }
 
 
+DEFAULT_CODEX_MODEL = "gpt-5.6-sol"
+DEFAULT_CODEX_REASONING_EFFORT = "medium"
+
+
 def build_technical_review_config(
     workspace: str | Path,
     *,
@@ -94,6 +98,8 @@ def build_technical_review_config(
             "codex_primary": {
                 "adapter": "codex",
                 "command": [executable],
+                "model": DEFAULT_CODEX_MODEL,
+                "model_reasoning_effort": DEFAULT_CODEX_REASONING_EFFORT,
                 "permission": "read_only",
                 "extra_args": [],
                 "timeout": 300.0,
@@ -103,6 +109,8 @@ def build_technical_review_config(
             "codex_alternative": {
                 "adapter": "codex",
                 "command": [executable],
+                "model": DEFAULT_CODEX_MODEL,
+                "model_reasoning_effort": DEFAULT_CODEX_REASONING_EFFORT,
                 "permission": "read_only",
                 "extra_args": [],
                 "timeout": 300.0,

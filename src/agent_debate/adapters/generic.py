@@ -17,6 +17,7 @@ from agent_debate.adapters.base import (
     reject_literal_credentials,
     request_extra_args,
     request_max_output,
+    request_model,
     request_permission,
     request_timeout,
     request_workspace,
@@ -95,6 +96,12 @@ class GenericAdapter(BaseAdapter):
             stdin=stdin,
             timeout_seconds=request_timeout(request, agent_config),
             max_output_chars=request_max_output(request, agent_config),
+            provider_adapter=self.name,
+            provider_model=request_model(request, agent_config),
+            session_mode="unverified",
+            session_enforcement=(
+                "generic adapter cannot prove provider-level session isolation"
+            ),
         )
 
     def _resolve_command(

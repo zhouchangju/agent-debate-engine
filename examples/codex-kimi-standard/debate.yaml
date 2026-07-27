@@ -1,0 +1,107 @@
+schema_version: 1
+
+run:
+  output_dir: ../../.agent-debate/codex-kimi-runs
+  workspace: ../..
+  max_parallel: 1
+  stream: true
+
+agents:
+  codex_architect:
+    adapter: codex
+    command: [codex]
+    model: gpt-5.6-sol
+    model_reasoning_effort: high
+    permission: read_only
+    timeout: 600
+    max_output: 100000
+    retries: 0
+
+  kimi_alternative:
+    adapter: kimi
+    command: [kimi]
+    model: kimi-code/k3
+    reasoning_effort: high
+    permission: danger_full_access
+    timeout: 600
+    max_output: 100000
+    retries: 0
+
+  codex_critic:
+    adapter: codex
+    command: [codex]
+    model: gpt-5.6-sol
+    model_reasoning_effort: high
+    permission: read_only
+    timeout: 600
+    max_output: 100000
+    retries: 0
+
+  kimi_reviewer:
+    adapter: kimi
+    command: [kimi]
+    model: kimi-code/k3
+    reasoning_effort: high
+    permission: danger_full_access
+    timeout: 600
+    max_output: 100000
+    retries: 0
+
+  codex_judge:
+    adapter: codex
+    command: [codex]
+    model: gpt-5.6-sol
+    model_reasoning_effort: high
+    permission: read_only
+    timeout: 600
+    max_output: 100000
+    retries: 0
+
+workflow:
+  stages:
+    - id: proposals
+      mode: independent_sequential
+      participants:
+        - id: architect
+          agent: codex_architect
+          prompt: prompts/architect.md
+        - id: alternative
+          agent: kimi_alternative
+          prompt: prompts/alternative.md
+
+    - id: critique
+      mode: sequential
+      participants:
+        - id: critic
+          agent: codex_critic
+          prompt: prompts/critic.md
+
+    - id: revision
+      mode: sequential
+      participants:
+        - id: reviewer
+          agent: kimi_reviewer
+          prompt: prompts/reviewer.md
+
+  judge:
+    agent: codex_judge
+    prompt: prompts/judge.md
+
+  stop:
+    min_rounds: 1
+    max_rounds: 3
+    confidence_threshold: 0.85
+    stable_rounds: 2
+    max_elapsed_seconds: 1800
+
+context:
+  max_prompt_chars: 60000
+  max_requirement_chars: 12000
+  max_response_chars: 12000
+  keep_recent_rounds: 2
+
+failure:
+  on_agent_error: abort
+  on_judge_error: retry
+  require_all_participants: true
+  schema_repair_attempts: 1

@@ -305,6 +305,12 @@ def _validate_manifest_header(manifest: Mapping[str, Any], path: Path) -> None:
     for field, expected in fixed_pointers.items():
         if manifest.get(field) != expected:
             raise ArtifactIntegrityError(f"manifest {field} is not the canonical v1 path")
+    evidence_artifact = manifest.get("evidence_artifact")
+    if evidence_artifact is not None and evidence_artifact != "evidence.md":
+        raise ArtifactIntegrityError("manifest evidence_artifact is not the canonical v1 path")
+    result_artifact = manifest.get("result_artifact")
+    if result_artifact is not None and result_artifact != "result.json":
+        raise ArtifactIntegrityError("manifest result_artifact is not the canonical v1 path")
 
 
 def _validate_manifest_artifacts(manifest: Mapping[str, Any]) -> dict[str, Any]:
@@ -314,6 +320,12 @@ def _validate_manifest_artifacts(manifest: Mapping[str, Any]) -> dict[str, Any]:
     if not _BASELINE_ARTIFACTS.issubset(artifacts):
         missing = ", ".join(sorted(_BASELINE_ARTIFACTS - artifacts.keys()))
         raise ArtifactIntegrityError(f"manifest is missing baseline artifact(s): {missing}")
+    evidence_artifact = manifest.get("evidence_artifact")
+    if evidence_artifact is not None and evidence_artifact not in artifacts:
+        raise ArtifactIntegrityError("manifest evidence_artifact is not indexed")
+    result_artifact = manifest.get("result_artifact")
+    if result_artifact is not None and result_artifact not in artifacts:
+        raise ArtifactIntegrityError("manifest result_artifact is not indexed")
     for relative_text, record in artifacts.items():
         canonical = _canonical_manifest_path(relative_text)
         if canonical != relative_text:
@@ -920,6 +932,37 @@ class ArtifactStore:
         self._mutate_manifest(mutate)
         self.append_event("final_written", {"path": "final.md"})
         return copy.deepcopy(records["final.md"])
+
+    def write_evidence(self, text: object) -> dict[str, Any]:
+        """Persist the complete reader-facing evidence transcript."""
+
+        evidence_text = _as_text(text)
+        records = self._write_artifact_batch(
+            {Path("evidence.md"): evidence_text.encode("utf-8")}
+        )
+
+        def mutate(manifest: dict[str, Any]) -> None:
+            _artifacts_dict(manifest).update(records)
+            manifest["evidence_artifact"] = "evidence.md"
+
+        self._mutate_manifest(mutate)
+        self.append_event("evidence_written", {"path": "evidence.md"})
+        return copy.deepcopy(records["evidence.md"])
+
+    def write_result(self, document: Mapping[str, object]) -> dict[str, Any]:
+        """Persist the canonical machine-readable result document."""
+
+        records = self._write_artifact_batch(
+            {Path("result.json"): _json_bytes(document)}
+        )
+
+        def mutate(manifest: dict[str, Any]) -> None:
+            _artifacts_dict(manifest).update(records)
+            manifest["result_artifact"] = "result.json"
+
+        self._mutate_manifest(mutate)
+        self.append_event("result_written", {"path": "result.json"})
+        return copy.deepcopy(records["result.json"])
 
     def record_failure(
         self,
