@@ -1,5 +1,7 @@
 # Agent Debate Engine
 
+Repository: [github.com/zhouchangju/agent-debate-engine](https://github.com/zhouchangju/agent-debate-engine)
+
 Agent Debate Engine runs structured, multi-stage debates through local coding-agent CLIs. It gives
 independent agent profiles distinct roles, preserves the dependency between proposal, criticism,
 revision, and judgment, and writes an auditable run instead of returning an opaque blob of text.
@@ -42,8 +44,10 @@ agent-debate run --config debate.yaml "Design a durable agent memory subsystem"
 
 The `debate` command is an alias for `agent-debate`.
 
-`init` writes an editable `debate.yaml` and role prompts. Models are intentionally omitted so each
-CLI uses its configured default. Every run receives a collision-safe directory below
+`init` writes an editable `debate.yaml` and role prompts. The bundled template defaults Codex to
+`gpt-5.6-sol` (model `gpt-5.6-sol`) with `model_reasoning_effort: medium`, and each agent runs
+under `read_only`. Every run receives a
+collision-safe directory below
 `.agent-debate/runs/`. Initialization never follows a symbolic link in the destination path: the
 destination and every existing ancestor must be real directories.
 
@@ -210,6 +214,38 @@ python -m build
 
 The default test suite uses fake executables and never spends model tokens or requires provider
 credentials. Real CLI smoke tests, when present, must remain explicitly opt-in.
+
+## Codex + Kimi role-mapped workflow
+
+[`examples/codex-kimi-standard/debate.yaml`](examples/codex-kimi-standard/debate.yaml)
+assigns Architect, Critic, and Judge to Codex and Alternative and Reviewer to
+Kimi. Its proposal stage uses `independent_sequential`: sibling prompts are
+frozen from the same context before either provider runs, while provider
+processes execute serially. This prevents sibling-output leakage without
+concurrently launching write-capable Kimi.
+
+Every terminal run writes `evidence.md` beside `final.md`. It contains the
+original task, role/model mapping, fresh-session declaration, exact prompt,
+final output, raw stdout/stderr, and structured Judge decisions for every
+invocation. The example remains outside the safe Skill boundary and requires
+`--allow-unsafe` plus external containment.
+
+## Local history dashboard
+
+Every terminal run now writes a versioned `result.json` alongside `final.md`,
+`evidence.md`, and `manifest.json`. Browse all histories below `.agent-debate`
+without opening individual files:
+
+```bash
+uv run agent-debate-dashboard --root .agent-debate
+```
+
+The local-only interface provides history search, status filters, final
+decisions, unresolved risks, role/model mapping, Round timelines, and every
+invocation's exact input, output, stdout, and stderr. Existing v1 runs without
+`result.json` are adapted in memory. See
+[the dashboard guide](docs/dashboard.md) and
+[the result schema](src/agent_debate/schemas/result-v1.json).
 
 ## Project status
 

@@ -68,6 +68,7 @@ agents:
   codex_primary:
     adapter: codex
     command: ["codex"]
+    model: gpt-5.6-sol
     permission: read_only
     extra_args: []
     timeout: 300
@@ -76,6 +77,7 @@ agents:
   codex_alternative:
     adapter: codex
     command: ["codex"]
+    model: gpt-5.6-sol
     permission: read_only
     extra_args: []
     timeout: 300
@@ -87,7 +89,9 @@ agents:
 |---|---:|---:|---|
 | `adapter` | `codex`, `kimi`, or `generic` | required | Adapter contract to use. |
 | `command` | non-empty list of strings | required | Executable argv; built-in adapters require exactly one item, while generic may use a trusted prefix. |
-| `model` | string or null | null | Optional CLI model alias. Omit to inherit the CLI's configured default. |
+| `model` | string or null | null | Optional CLI model alias. Omit to inherit the CLI's configured default or adapter fallback (`gpt-5.6-sol` for Codex, `k3` for Kimi). |
+| `model_reasoning_effort` | string or null | null | Optional Codex `model_reasoning_effort` override passed as `--config model_reasoning_effort=<value>`. If omitted, `medium` is used. |
+| `reasoning_effort` | string or null | null | Optional Kimi thinking-effort override passed as `KIMI_MODEL_THINKING_EFFORT=<value>`. If omitted, `high` is used. `standard` is normalized to `high` by the adapter for compatibility with UI naming. |
 | `permission` | permission enum | `read_only` | Requested provider permission; see below. |
 | `extra_args` | list of strings | `[]` | Additional trusted argv for generic only; built-in adapters reject non-empty values. |
 | `timeout` | positive number | `300` | Per-attempt timeout in seconds. |
@@ -106,11 +110,19 @@ or selecting `read_only`/`workspace_write` fails before a model call.
 
 ### Model selection
 
-The bundled template defines two Codex profiles and does not set `model`. This avoids hardcoding an
-alias that may not exist in another user's authenticated CLI configuration. Codex and Kimi profiles
-may set `model` when the local provider is known to support the alias and reproducibility is more
-important than portability. The resolved configuration snapshot records whether a model override
-was supplied.
+The bundled template defines two Codex profiles and sets `model: gpt-5.6-sol` with
+`model_reasoning_effort: medium`, matching the OpenAI Codex configuration used by the
+safe preset in this repository. In Codex mode this produces a CLI argument sequence that includes
+`--config model_reasoning_effort=medium`.
+
+For Kimi, the adapter-level defaults are `model: k3` and `reasoning_effort: high` when
+the field is omitted in config. If you explicitly set one of these values, it takes precedence.
+The `standard` mode in Kimi UX maps to `high` on the current CLI effort API,
+so users typically set `reasoning_effort: high` directly.
+
+Codex and Kimi profiles may also set `model` when the local provider supports the ID and
+reproducibility is more important than portability. The resolved configuration snapshot records whether
+each model-related override was supplied.
 
 Built-in adapters own the ordered argv that controls prompt transport, model selection, workspace,
 structured/final output, permission mode, provider configuration, profiles, and feature toggles.
@@ -118,6 +130,11 @@ structured/final output, permission mode, provider configuration, profiles, and 
 `--config`, `--profile`, or feature flags to weaken the adapter's sandbox contract, and Kimi cannot
 replace its prompt, output-format, permission-mode, model, or directory arguments. Use a generic
 profile only when a different trusted wrapper contract is genuinely required.
+
+For Kimi defaults, note that Kimi model IDs are not version labels; use ID values from the official
+model list such as `k3`, `k3-256k`, `kimi-for-coding`, or `kimi-for-coding-highspeed`. In K3, the
+default reasoning effort is `high` when effort is unspecified, and supported effort mappings are
+`low`/`minimum`/`light`, `high`/`medium`, and `ultra`/`max`/`xhigh` per the Kimi docs.
 
 ### Permissions
 
@@ -194,7 +211,8 @@ workflow:
 `stages` is a non-empty ordered list capped at 32 entries. Each stage has:
 
 - a unique `id`;
-- `mode: parallel` or `mode: sequential` (default `parallel`);
+- `mode: parallel`, `mode: sequential`, or `mode: independent_sequential`
+  (default `parallel`);
 - one to 32 `participants`.
 
 Each participant has an `id` unique within its stage, an `agent` reference, and a readable `prompt`
@@ -205,6 +223,15 @@ Stages always execute in list order. In a parallel stage, participants start con
 to `run.max_parallel`; the next stage waits for all required participants. In a sequential stage,
 participants execute in list order. Generic profiles are never permitted in a parallel stage,
 regardless of the permission label recorded in YAML.
+
+In an `independent_sequential` stage, every participant prompt is built from the
+same pre-stage evidence before execution begins, then participants run one at a
+time. Use it when independent opinions are required but concurrent provider
+processes are unsafe or undesirable.
+
+The complete Codex/Kimi role mapping is available in
+`examples/codex-kimi-standard/debate.yaml`. It intentionally requires
+`--allow-unsafe` because Kimi headless mode is write-capable.
 
 `workflow.judge.agent` references an agent profile and `workflow.judge.prompt` points to a Judge
 prompt. The bundled prompt requires exactly one Judge schema-v1 object.

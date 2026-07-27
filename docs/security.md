@@ -1,5 +1,18 @@
 # Security model
 
+## Provider session isolation
+
+Each built-in invocation starts from a new provider session contract. Codex is
+invoked with `codex exec --ephemeral`. Kimi is invoked as a new headless prompt
+without `--session`, `--continue`, or their short aliases. Retries and resumed
+engine runs create new provider processes rather than resuming provider
+conversation state.
+
+The invocation `meta.json` and root `evidence.md` record the adapter, model,
+session mode, and enforcement mechanism. Generic adapters are marked
+`unverified` because the engine cannot prove session behavior for arbitrary
+executables.
+
 Agent Debate Engine reduces execution risk; it does not make arbitrary agent CLIs, prompts, models,
 or repositories trustworthy. Its safest built-in configuration is a text-only architecture debate
 using Codex `read_only` profiles in a dedicated, non-sensitive workspace.

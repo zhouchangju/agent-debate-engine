@@ -67,9 +67,10 @@ read-only would be a false security guarantee.
 
 A model alias is deployment-specific and can disappear or point to different capabilities.
 Hardcoding one in a distributable template would improve neither correctness nor reproducibility
-unless the provider configuration were also controlled. The template therefore omits `model` and
-inherits each CLI's configured default. A controlled deployment can pin the field and accept the
-portability cost.
+unless the provider configuration were also controlled. The template omits `model` by default to keep
+defaults portable across environments. The adapter layer currently applies stable fallback defaults
+(`gpt-5.6-sol`/`medium` for Codex, `k3`/`high` for Kimi) so unconfigured profiles still get
+predictable runtime behavior while avoiding a locked model in the template.
 
 ### Read-only by default, with two-part escalation
 

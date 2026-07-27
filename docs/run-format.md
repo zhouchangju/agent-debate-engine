@@ -1,5 +1,14 @@
 # Run directory format
 
+## Complete evidence projection
+
+Each terminal run includes a canonical root-level `evidence.md`. It is a
+reader-facing projection of the immutable run artifacts, not a replacement for
+them. It contains the original task, role/agent/adapter/model map, session
+isolation declaration, exact input, final output, raw stdout/stderr, and every
+structured Judge decision. The manifest points to it with
+`evidence_artifact: evidence.md`.
+
 Each execution owns one collision-safe directory below `run.output_dir`. The directory is the
 durable audit and resume boundary; consumers should not infer state from console output.
 
