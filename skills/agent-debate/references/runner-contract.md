@@ -41,12 +41,23 @@ Terminal engine states are valid results even when they did not converge:
   "stop_reason": "convergence criteria satisfied",
   "final_report": "...",
   "manifest_path": "/absolute/run/manifest.json",
-  "final_path": "/absolute/run/final.md"
+  "result_path": "/absolute/run/result.json",
+  "final_path": "/absolute/run/final.md",
+  "evidence_path": "/absolute/run/evidence.md",
+  "dashboard_url": "http://127.0.0.1:8765/?run=20260726T...",
+  "dashboard_opened": true,
+  "dashboard_reused": false
 }
 ```
 
 `depth` is omitted for resume because the snapshotted configuration, not the
 current conversation, controls resumed execution.
+
+Dashboard fields are emitted only when `--open-dashboard` is requested. The
+runner reuses a healthy local service whose root contains the run, otherwise it
+starts a detached loopback-only service. Dashboard failure is reported through
+`dashboard_opened: false` and `dashboard_error`; it does not change the debate
+terminal status.
 
 ## Error response
 

@@ -15,6 +15,7 @@ from typing import Any, NoReturn
 from agent_debate.engine import EngineResult, resume_debate, run_debate
 from agent_debate.errors import ConfigError, DebateError
 from agent_debate.presets import DebateDepth, build_technical_review_config
+from agent_debate.dashboard_launcher import open_run_dashboard
 
 _EXIT_ERROR = 1
 _EXIT_USAGE = 2
@@ -51,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="UTF-8 task file. Task text is never placed in process argv.",
     )
+    run_parser.add_argument("--open-dashboard", action="store_true")
 
     resume_parser = subparsers.add_parser(
         "resume",
@@ -58,6 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     resume_parser.add_argument("run_dir", type=Path)
     resume_parser.add_argument("--retry-failed", action="store_true")
+    resume_parser.add_argument("--open-dashboard", action="store_true")
     return parser
 
 
@@ -159,7 +162,10 @@ async def _run_command(args: argparse.Namespace) -> dict[str, Any]:
             run_dir=run_dir,
             cause=exc,
         ) from exc
-    return _result_payload(result, depth=args.depth)
+    payload = _result_payload(result, depth=args.depth)
+    if args.open_dashboard:
+        payload.update(_dashboard_payload(result.run_dir))
+    return payload
 
 
 async def _resume_command(args: argparse.Namespace) -> dict[str, Any]:
@@ -172,7 +178,25 @@ async def _resume_command(args: argparse.Namespace) -> dict[str, Any]:
         )
     except DebateError as exc:
         raise _RunnerError(str(exc), run_dir=run_dir, cause=exc) from exc
-    return _result_payload(result, depth=None)
+    payload = _result_payload(result, depth=None)
+    if args.open_dashboard:
+        payload.update(_dashboard_payload(result.run_dir))
+    return payload
+
+
+def _dashboard_payload(run_dir: Path) -> dict[str, Any]:
+    try:
+        launch = open_run_dashboard(run_dir)
+    except (OSError, RuntimeError, UnicodeError, ValueError) as exc:
+        return {
+            "dashboard_opened": False,
+            "dashboard_error": str(exc),
+        }
+    return {
+        "dashboard_url": launch.url,
+        "dashboard_opened": launch.browser_opened,
+        "dashboard_reused": launch.reused,
+    }
 
 
 def _read_task_file(path: Path, *, max_chars: int) -> str:
@@ -218,7 +242,9 @@ def _result_payload(result: EngineResult, *, depth: str | None) -> dict[str, Any
         "stop_reason": result.stop_reason,
         "final_report": result.final_report,
         "manifest_path": str(result.run_dir / "manifest.json"),
+        "result_path": str(result.run_dir / "result.json"),
         "final_path": str(result.run_dir / "final.md"),
+        "evidence_path": str(result.run_dir / "evidence.md"),
     }
     if depth is not None:
         payload["depth"] = depth
@@ -255,6 +281,12 @@ def _error_payload(error: BaseException) -> dict[str, Any]:
     if isinstance(error, _RunnerError) and error.run_dir is not None:
         payload["run_dir"] = str(error.run_dir)
         payload["manifest_path"] = str(error.run_dir / "manifest.json")
+        result_path = error.run_dir / "result.json"
+        if result_path.is_file():
+            payload["result_path"] = str(result_path)
+        evidence_path = error.run_dir / "evidence.md"
+        if evidence_path.is_file():
+            payload["evidence_path"] = str(evidence_path)
     return payload
 
 

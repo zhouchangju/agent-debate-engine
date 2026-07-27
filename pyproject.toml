@@ -29,6 +29,10 @@ dependencies = [
   "typer>=0.16,<1",
 ]
 
+[project.urls]
+Repository = "https://github.com/zhouchangju/agent-debate-engine"
+Issues = "https://github.com/zhouchangju/agent-debate-engine/issues"
+
 [project.optional-dependencies]
 dev = [
   "build>=1.2,<2",
@@ -43,6 +47,7 @@ dev = [
 [project.scripts]
 agent-debate = "agent_debate.cli:app"
 debate = "agent_debate.cli:app"
+agent-debate-dashboard = "agent_debate.dashboard:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

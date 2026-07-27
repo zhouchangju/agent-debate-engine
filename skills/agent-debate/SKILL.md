@@ -74,13 +74,14 @@ Run:
 python <skill-dir>/scripts/run_debate.py run \
   --workspace <workspace> \
   --depth <quick|standard|deep> \
-  --task-file <task-file>
+  --task-file <task-file> \
+  --open-dashboard
 ```
 
 Resume:
 
 ```bash
-python <skill-dir>/scripts/run_debate.py resume <run-dir>
+python <skill-dir>/scripts/run_debate.py resume <run-dir> --open-dashboard
 ```
 
 Add `--retry-failed` only when the user explicitly asks to retry a run already
@@ -104,6 +105,9 @@ For a successful runner response:
    - `timed_out`: the global time budget ended.
 4. Preserve uncertainty and unresolved issues from the final report.
 5. Link the exact run directory so the user can inspect the evidence.
+6. Confirm `dashboard_url` and tell the user that the local result page was
+   opened. If `dashboard_opened` is false, report `dashboard_error` without
+   downgrading an otherwise valid debate result.
 
 Respond in the user's language with this compact structure:
 
