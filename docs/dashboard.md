@@ -28,6 +28,22 @@ The service refuses non-loopback binding unless `--allow-remote` is supplied.
 Prompts, model outputs, and logs can contain private repository information, so
 remote exposure is intentionally not the default.
 
+## Timing semantics
+
+The overview distinguishes two different costs:
+
+- total wall time comes from `run.elapsed_seconds` and represents user-visible
+  wait time from engine start to terminal result;
+- cumulative invocation time sums every
+  `rounds[].invocations[].timing.duration_seconds`.
+
+Cumulative invocation time can exceed wall time when agents run concurrently.
+It includes the complete supervised provider process, including provider queue,
+tool use, reasoning, and output transport; it must not be presented as pure
+model inference time. Each Round shows its own wall-clock span and cumulative
+invocation time, and every invocation row shows status and duration without
+requiring expansion.
+
 ## Reader contract
 
 New terminal runs write:

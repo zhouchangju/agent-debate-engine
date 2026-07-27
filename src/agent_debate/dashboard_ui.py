@@ -87,7 +87,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     .run-id { color: var(--muted); font: 12px/1.4 "SFMono-Regular", Consolas, monospace; word-break: break-all; }
     .menu { display: none; }
     .metrics {
-      display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; margin: 24px 0;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; margin: 24px 0;
     }
     .metric { background: rgba(255,253,247,.72); border: 1px solid var(--line); border-radius: 13px; padding: 14px 16px; }
     .metric strong { display: block; font: 750 24px/1 "Iowan Old Style", serif; }
@@ -145,6 +145,7 @@ DASHBOARD_HTML = r"""<!doctype html>
     .role-mark { width: 9px; height: 32px; border-radius: 6px; background: var(--accent); }
     .inv-title { font-weight: 800; text-transform: capitalize; }
     .inv-sub { color: var(--muted); font-size: 12px; margin-left: auto; text-align: right; }
+    .inv-duration { color: var(--ink); font-weight: 850; }
     .fresh { color: var(--ok); font-size: 11px; font-weight: 800; }
     .inv-body { border-top: 1px solid var(--line); padding: 16px; display: grid; gap: 10px; }
     .content-detail { border: 1px solid var(--line); border-radius: 9px; }
@@ -196,6 +197,14 @@ DASHBOARD_HTML = r"""<!doctype html>
     const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
     const date = (v) => v ? new Intl.DateTimeFormat("zh-CN", {dateStyle:"medium", timeStyle:"short"}).format(new Date(v)) : "未知时间";
     const duration = (v) => Number.isFinite(v) ? (v < 60 ? `${v.toFixed(1)} 秒` : `${Math.floor(v/60)} 分 ${Math.round(v%60)} 秒`) : "—";
+    const cumulativeDuration = (rounds) => (rounds || []).flatMap(r => r.invocations || [])
+      .reduce((total, inv) => total + (Number.isFinite(inv.timing?.duration_seconds) ? inv.timing.duration_seconds : 0), 0);
+    const roundWallDuration = (round) => {
+      const starts = (round.invocations || []).map(inv => Date.parse(inv.timing?.started_at)).filter(Number.isFinite);
+      const finishes = (round.invocations || []).map(inv => Date.parse(inv.timing?.finished_at)).filter(Number.isFinite);
+      if (!starts.length || !finishes.length) return null;
+      return Math.max(0, (Math.max(...finishes) - Math.min(...starts)) / 1000);
+    };
     const markdown = (value) => {
       const lines = esc(value).split("\n");
       let inCode = false, list = false, out = [];
@@ -298,7 +307,8 @@ DASHBOARD_HTML = r"""<!doctype html>
         <div><pre class="content-block">${esc(value || "（空）")}</pre></div></details>`;
       return `<details class="invocation">
         <summary><span class="role-mark"></span><span><span class="inv-title">${esc(inv.role_id)}</span><br><span class="fresh">${esc(session.mode)}</span></span>
-        <span class="inv-sub">${esc(inv.adapter)} · ${esc(inv.model || "default")}<br>${duration(inv.timing?.duration_seconds)}</span></summary>
+        <span class="inv-sub">${esc(inv.adapter)} · ${esc(inv.model || "default")} · ${esc(inv.status || "unknown")}<br>
+        <span class="inv-duration">${duration(inv.timing?.duration_seconds)}</span></span></summary>
         <div class="inv-body">
           <div class="run-id">${esc(inv.invocation_id)} · ${esc(inv.stage)} · attempt ${esc(inv.attempt)}</div>
           ${block("最终输出", content.output, true)}
@@ -310,8 +320,11 @@ DASHBOARD_HTML = r"""<!doctype html>
     function rounds(values) {
       return (values || []).map(round => {
         const judge = round.judge?.decision || {};
+        const wall = roundWallDuration(round);
+        const cumulative = cumulativeDuration([round]);
         return `<section class="round"><div class="round-head"><div class="round-no">${round.number}</div>
-          <div><strong>Round ${round.number}</strong><div style="color:var(--muted);font-size:12px">${round.invocations.length} 次调用</div></div></div>
+          <div><strong>Round ${round.number}</strong><div style="color:var(--muted);font-size:12px">
+          ${round.invocations.length} 次调用 · 墙钟 ${duration(wall)} · 累计调用 ${duration(cumulative)}</div></div></div>
           <div class="invocations">${round.invocations.map(invocationCard).join("")}</div>
           ${round.judge ? `<div class="card judge"><h3>Judge · ${esc(judge.verdict || "unknown")}</h3>
             <div class="confidence">置信度 ${Math.round((judge.confidence || 0) * 100)}%</div>
@@ -324,12 +337,15 @@ DASHBOARD_HTML = r"""<!doctype html>
       const run = doc.run || {}, decision = doc.summary?.decision || {};
       const unresolved = decision.unresolved_issues || [];
       const major = unresolved.filter(x => x.severity === "major").length;
+      const invocationTotal = cumulativeDuration(doc.rounds);
       $("#main").innerHTML = `
         <div class="topline"><div class="title-wrap"><div class="eyebrow">Decision record · schema v${esc(doc.schema_version)}</div>
           <h2>${esc(run.title)}</h2><div class="run-id">${esc(run.id)}</div></div>
           <button class="menu" id="menu">历史记录</button></div>
         <div class="metrics">
           ${metric(run.status || "unknown", "状态")}
+          ${metric(duration(run.elapsed_seconds), "总耗时（墙钟）")}
+          ${metric(duration(invocationTotal), "累计调用耗时")}
           ${metric(run.round_count || 0, "Rounds")}
           ${metric(run.invocation_count || 0, "模型调用")}
           ${metric(decision.confidence != null ? `${Math.round(decision.confidence*100)}%` : "—", "Judge 置信度")}
