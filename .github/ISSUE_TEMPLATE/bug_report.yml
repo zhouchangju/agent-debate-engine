@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible defect without private prompts or credentials.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach `.agent-debate/` directories, credentials, sensitive prompts, or private
+        repository content. Follow SECURITY.md for vulnerabilities.
+  - type: input
+    id: version
+    attributes:
+      label: Agent Debate Engine version
+      placeholder: "0.1.0 or commit SHA"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Python version, and sanitized provider CLI versions.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Prefer fake executables and synthetic task text.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed credentials, private prompts, local paths, and proprietary source.
+          required: true

@@ -10,6 +10,23 @@ All notable changes to this project are documented here. The format follows
 - Versioned `agent-debate` Skill for natural-language technical reviews, previews, and resume.
 - Safe `quick`, `standard`, and `deep` technical-review presets for embedding callers.
 - A structured JSON Skill runner with request-owned artifact roots and actionable failure output.
+- Independent transport and authoritative-final-output budgets, with legacy `max_output`
+  configurations retaining their previous shared-limit behavior.
+- Bounded Codex JSON-event capture: managed final-output invocations now continue after transport
+  evidence reaches its limit while recording truncation and total observed characters.
+- Successful managed-output Codex invocations now clean up helper processes without discarding the
+  completed answer; commands without that explicit contract still fail closed on residual children.
+- Source-tree Skill runs now propagate the package import path to detached Dashboard processes and
+  surface child exit diagnostics when startup fails.
+- One-hour technical-review participant timeouts, with proportionally larger quick, standard, and
+  deep run budgets for repository-wide analysis.
+- Fail-closed CI contract tests, pinned GitHub Actions, bounded jobs, and tag/manual triggers.
+- Public support, provenance, release, contribution, issue, and pull-request boundaries.
+- A sanitized decision-artifact walkthrough that contains no provider or local runtime data.
+
+### Fixed
+
+- Dashboard lint and strict-mypy failures that kept every public quality-matrix job red.
 
 ## [0.1.0] - 2026-07-26
 

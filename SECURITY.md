@@ -2,10 +2,11 @@
 
 ## Reporting a vulnerability
 
-Do not publish credentials, sensitive prompts, or exploit details in a public issue. If the hosting
-repository or package distribution publishes a private vulnerability-reporting channel, use that
-channel. If no private channel is published, open a minimal public issue asking the maintainers to
-establish private contact; include no vulnerability details until that private channel exists.
+Do not publish credentials, sensitive prompts, or exploit details in a public issue. Use
+[GitHub private vulnerability reporting](https://github.com/zhouchangju/agent-debate-engine/security/advisories/new)
+when it is enabled. If that channel is unavailable, open a minimal public issue asking the
+maintainers to establish private contact; include no vulnerability details until that private
+channel exists.
 
 Include the affected version, operating system, reproduction prerequisites, impact, and the
 smallest safe reproduction. Remove provider credentials, real prompts, and unrelated local data.

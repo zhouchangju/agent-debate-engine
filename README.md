@@ -53,9 +53,9 @@ destination and every existing ancestor must be real directories.
 
 ## Natural-language Skill
 
-The versioned Skill in `skills/agent-debate/` turns the safe technical-review workflow into a
-natural-language interface. Install it once by linking the repository copy into the global Skill
-directory:
+The versioned [Agent Debate Skill](skills/agent-debate/README.md) turns the safe technical-review
+workflow into a natural-language interface. Install it once by linking the repository copy into
+the global Skill directory:
 
 ```bash
 ln -s \
@@ -182,6 +182,11 @@ sequence, then checks lifecycle eligibility and Judge barriers before loading pe
 configuration or running provider preflight. Only a schema-valid Judge decision is a completed
 round checkpoint.
 
+Transport logs remain bounded. Providers whose stdout is authoritative fail when that budget is
+crossed. Codex calls with a managed final-output artifact keep draining oversized JSON event
+streams, retain only the configured transport evidence budget, and record truncation plus the
+total observed character count in `meta.json`; the final response still has its own strict limit.
+
 Writes are atomic where replacement is required, run directories and files are private on
 supported POSIX systems, and an append-only event log preserves state transitions. Codex-owned
 output is first collected below the engine's private state root, outside the workspace and system
@@ -202,6 +207,16 @@ See:
 - [architecture](docs/architecture.md)
 - [security and trust boundaries](docs/security.md)
 - [first-principles design review](docs/first-principles-review.md)
+- [project purpose, onboarding rationale, and Multica positioning](docs/project-purpose-and-positioning.md)
+- [onboarding presentation (HTML)](docs/agent-debate-engine-onboarding.html)
+- [source and dependency provenance policy](docs/provenance.md)
+- [release process](docs/releasing.md)
+- [support and maintenance boundaries](SUPPORT.md)
+- [code of conduct](CODE_OF_CONDUCT.md)
+
+For a safe public walkthrough without provider calls or private run data, use the
+[sanitized decision example](examples/sanitized-decision/README.md). It is an explicitly illustrative
+artifact contract, not a claimed model transcript.
 
 ## Development
 

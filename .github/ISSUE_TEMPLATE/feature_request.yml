@@ -1,0 +1,37 @@
+name: Feature request
+description: Propose a focused extension to the bounded debate protocol.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: External user problem
+      description: Describe the decision problem, not only the requested mechanism.
+    validations:
+      required: true
+  - type: textarea
+    id: simpler
+    attributes:
+      label: Simpler alternative
+      description: Explain why one agent, one prompt, a test, or an authoritative document is insufficient.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Include boundaries, failure behavior, and observable acceptance criteria.
+    validations:
+      required: true
+  - type: checkboxes
+    id: invariants
+    attributes:
+      label: Protocol invariants
+      options:
+        - label: The proposal preserves deterministic stopping and explicit terminal states.
+          required: true
+        - label: The proposal preserves bounded resources and auditable artifacts.
+          required: true
+        - label: The proposal does not silently widen provider permissions.
+          required: true
