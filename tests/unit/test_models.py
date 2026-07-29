@@ -119,6 +119,7 @@ def test_agent_request_rejects_coerced_schema_versions(
         {"extra_args": [""]},
         {"timeout_seconds": 0},
         {"max_output_chars": 0},
+        {"max_final_output_chars": 0},
         {"round_number": 0},
         {"model_reasoning_effort": "bad\x00effort"},
         {"reasoning_effort": "\x00"},
@@ -145,6 +146,8 @@ def test_agent_result_success_contract_and_json_dump() -> None:
     assert dumped["status"] == "success"
     assert dumped["started_at"].endswith("Z")
     assert dumped["display_command"][2] == "<prompt-via-stdin>"
+    assert dumped["transport_truncated"] is False
+    assert dumped["transport_observed_chars"] == 0
 
 
 @pytest.mark.parametrize(
@@ -157,6 +160,11 @@ def test_agent_result_success_contract_and_json_dump() -> None:
         {"status": "timed_out", "timed_out": False, "exit_code": None},
         {"status": "failed", "timed_out": True, "exit_code": 1},
         {"status": "output_limit", "truncated": False, "exit_code": 1},
+        {
+            "transport_truncated": True,
+            "transport_observed_chars": len("proposal"),
+        },
+        {"transport_observed_chars": -1},
         {"input_hash": "not-a-sha256"},
     ],
 )

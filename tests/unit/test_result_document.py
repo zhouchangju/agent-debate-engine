@@ -62,11 +62,11 @@ def _fixture() -> tuple[dict[str, object], dict[str, str]]:
                 "session_mode": "fresh",
                 "session_enforcement": "codex exec --ephemeral",
                 "status": "success",
+                "transport_truncated": True,
+                "transport_observed_chars": 250000,
             }
         ),
-        "rounds/001/judge/decision.json": json.dumps(
-            {"verdict": "finalize", "confidence": 0.9}
-        ),
+        "rounds/001/judge/decision.json": json.dumps({"verdict": "finalize", "confidence": 0.9}),
         "rounds/001/judge/raw.md": '{"verdict":"finalize"}',
     }
     return manifest, artifacts
@@ -92,6 +92,8 @@ def test_result_document_normalizes_rounds_roles_and_content() -> None:
     assert invocation["content"]["input"] == "EXACT INPUT"
     assert invocation["content"]["output"] == "EXACT OUTPUT"
     assert invocation["session"]["mode"] == "fresh"
+    assert invocation["execution"]["transport_truncated"] is True
+    assert invocation["execution"]["transport_observed_chars"] == 250000
     assert document["rounds"][0]["judge"]["decision"]["verdict"] == "finalize"
 
 

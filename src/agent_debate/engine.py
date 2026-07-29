@@ -858,6 +858,7 @@ class DebateEngine:
                     min(agent_config.timeout_seconds, remaining),
                 ),
                 max_output_chars=agent_config.max_output_chars,
+                max_final_output_chars=agent_config.max_final_output_chars,
                 model=agent_config.model,
                 permission=agent_config.permission,
                 extra_args=(),
@@ -921,13 +922,21 @@ class DebateEngine:
             duration_seconds=max(0.0, time.monotonic() - started_clock),
             timed_out=status is InvocationStatus.TIMED_OUT,
             truncated=status is InvocationStatus.OUTPUT_LIMIT,
+            transport_truncated=(
+                process_result.transport_truncated
+                if process_result is not None
+                else _error_bool(error, "transport_truncated")
+            ),
+            transport_observed_chars=(
+                process_result.transport_observed_chars
+                if process_result is not None
+                else (_error_int(error, "transport_observed_chars") or 0)
+            ),
             display_command=display_command,
             input_hash=content_sha256(prompt),
             output_hash=content_sha256(output_hash_source),
             provider_adapter=(spec.provider_adapter if spec is not None else adapter.name),
-            provider_model=(
-                spec.provider_model if spec is not None else agent_config.model
-            ),
+            provider_model=(spec.provider_model if spec is not None else agent_config.model),
             session_mode=(spec.session_mode if spec is not None else "unverified"),
             session_enforcement=(
                 spec.session_enforcement
@@ -1455,7 +1464,12 @@ def _error_text(error: DebateError | None, name: str) -> str:
 
 def _error_int(error: DebateError | None, name: str) -> int | None:
     value = getattr(error, name, None) if error is not None else None
-    return value if isinstance(value, int) else None
+    return value if type(value) is int else None
+
+
+def _error_bool(error: DebateError | None, name: str) -> bool:
+    value = getattr(error, name, False) if error is not None else False
+    return value if type(value) is bool else False
 
 
 def _invocation_status(error: DebateError | None) -> InvocationStatus:

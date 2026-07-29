@@ -92,7 +92,13 @@ Adapters translate a typed invocation into an argv list and launch a subprocess 
   stage.
 
 Adapters normalize exit status, timeout, stdout, stderr, final response, and timing metadata. They
-enforce output limits and do not infer that a non-empty response is a successful Judge decision.
+enforce independent transport and authoritative-final-output limits and do not infer that a
+non-empty response is a successful Judge decision. Transport overflow remains a strict failure
+when stdout is authoritative. When Codex writes a separate managed final artifact, the supervisor
+continues draining its JSON event stream after the capture budget is full, discards further
+transport text, and records both the truncation and total observed character count. The bounded
+final artifact still determines success and remains subject to its own strict limit. Legacy
+configurations that omit the final limit inherit their transport limit.
 Codex-managed final output is staged below the engine's private POSIX state root, which must be
 disjoint from the workspace and system temporary directory. The adapter accepts only a stable,
 regular, single-link output file, then copies validated text into canonical run artifacts and
@@ -182,10 +188,12 @@ that uncheckpointed fraction; an external supervisor is required for a deadline 
 process or host termination.
 
 On supported POSIX systems, each subprocess runs in a dedicated process group. Timeout,
-cancellation, output overflow, and residual descendants trigger bounded TERM/KILL cleanup. This is
-best-effort supervision rather than an OS sandbox: a hostile process may deliberately escape its
-process group. Unsafe providers still require external containment such as a container, VM, or
-restricted account.
+cancellation, output overflow, and residual descendants trigger bounded TERM/KILL cleanup.
+Residual descendants normally make the invocation fail. A successful Codex invocation with a
+managed final-output artifact may continue only after that cleanup succeeds, because Codex can
+leave short-lived helper processes behind after its leader exits. This is best-effort supervision
+rather than an OS sandbox: a hostile process may deliberately escape its process group. Unsafe
+providers still require external containment such as a container, VM, or restricted account.
 
 ## Deliberate boundaries
 

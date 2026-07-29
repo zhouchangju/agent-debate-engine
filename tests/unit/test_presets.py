@@ -13,18 +13,18 @@ from agent_debate.presets import DebateDepth, build_technical_review_config
 @pytest.mark.parametrize(
     ("depth", "expected"),
     [
-        (DebateDepth.QUICK, (1, 1, 1, 1)),
-        (DebateDepth.STANDARD, (1, 3, 1, 2)),
-        (DebateDepth.DEEP, (2, 5, 2, 3)),
+        (DebateDepth.QUICK, (1, 1, 1, 1, 3_600.0)),
+        (DebateDepth.STANDARD, (1, 3, 1, 2, 10_800.0)),
+        (DebateDepth.DEEP, (2, 5, 2, 3, 21_600.0)),
     ],
 )
 def test_technical_review_depths_are_bounded_and_safe(
     tmp_path: Path,
     depth: DebateDepth,
-    expected: tuple[int, int, int, int],
+    expected: tuple[int, int, int, int, float],
 ) -> None:
     config = build_technical_review_config(tmp_path, depth=depth)
-    min_rounds, max_rounds, stable_rounds, keep_recent = expected
+    min_rounds, max_rounds, stable_rounds, keep_recent, max_elapsed = expected
 
     assert config.run.workspace == tmp_path.resolve()
     assert config.run.output_dir == tmp_path / ".agent-debate" / "skill-runs"
@@ -33,6 +33,7 @@ def test_technical_review_depths_are_bounded_and_safe(
     assert config.workflow.stop.min_rounds == min_rounds
     assert config.workflow.stop.max_rounds == max_rounds
     assert config.workflow.stop.stable_rounds == stable_rounds
+    assert config.workflow.stop.max_elapsed_seconds == max_elapsed
     assert config.context.keep_recent_rounds == keep_recent
     assert [stage.id for stage in config.workflow.stages] == [
         "proposals",
@@ -42,6 +43,9 @@ def test_technical_review_depths_are_bounded_and_safe(
     assert all(agent.adapter is AgentAdapter.CODEX for agent in config.agents.values())
     assert all(agent.permission is PermissionMode.READ_ONLY for agent in config.agents.values())
     assert all(agent.model_reasoning_effort == "medium" for agent in config.agents.values())
+    assert all(agent.timeout == 3_600.0 for agent in config.agents.values())
+    assert all(agent.max_output == 200_000 for agent in config.agents.values())
+    assert all(agent.max_final_output == 20_000 for agent in config.agents.values())
     assert all(
         participant.prompt.is_file()
         for stage in config.workflow.stages

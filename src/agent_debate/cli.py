@@ -302,6 +302,7 @@ def _validate_adapter_contracts(config: DebateConfig) -> dict[str, str]:
             cwd=config.run.workspace,
             timeout_seconds=agent.timeout_seconds,
             max_output_chars=agent.max_output_chars,
+            max_final_output_chars=agent.max_final_output_chars,
             model=agent.model,
             permission=agent.permission,
         )

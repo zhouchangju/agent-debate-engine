@@ -20,6 +20,7 @@ agents:
     extra_args: []
     timeout: 300
     max_output: 100000
+    max_final_output: 20000
     retries: 0
 
   codex_alternative:
@@ -31,6 +32,7 @@ agents:
     extra_args: []
     timeout: 300
     max_output: 100000
+    max_final_output: 20000
     retries: 0
 
 workflow:

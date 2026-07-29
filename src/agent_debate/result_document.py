@@ -44,11 +44,7 @@ def build_result_document(
     request_path = str(manifest.get("request_artifact") or "request.md")
     request = _read_text(read_artifact, request_path)
     final_path = manifest.get("final_artifact")
-    final_markdown = (
-        _read_text(read_artifact, final_path)
-        if isinstance(final_path, str)
-        else ""
-    )
+    final_markdown = _read_text(read_artifact, final_path) if isinstance(final_path, str) else ""
 
     rounds: dict[int, dict[str, Any]] = {}
     roles: list[dict[str, Any]] = []
@@ -114,6 +110,8 @@ def build_result_document(
                     "exit_code": meta.get("exit_code"),
                     "timed_out": meta.get("timed_out", False),
                     "truncated": meta.get("truncated", False),
+                    "transport_truncated": meta.get("transport_truncated", False),
+                    "transport_observed_chars": meta.get("transport_observed_chars", 0),
                     "display_command": meta.get("display_command", []),
                     "input_hash": meta.get("input_hash"),
                     "output_hash": meta.get("output_hash"),
@@ -176,8 +174,7 @@ def build_result_document(
             "stop_reason": manifest.get("stop_reason"),
             "round_count": manifest.get("round_count", len(rounds)),
             "invocation_count": sum(
-                len(round_record["invocations"])
-                for round_record in rounds.values()
+                len(round_record["invocations"]) for round_record in rounds.values()
             ),
             "started_at": manifest.get("started_at"),
             "finished_at": manifest.get("finished_at"),

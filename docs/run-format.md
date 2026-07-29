@@ -163,11 +163,17 @@ open, later operations fail; they never redirect a write into the replacement di
 `rounds/001/<stage>/<participant>/<invocation-id>/` contains:
 
 - `request.md`: the fully assembled role request sent to the adapter;
-- `stdout.log`: exact captured standard output;
-- `stderr.log`: exact captured standard error;
+- `stdout.log`: captured standard output, bounded by the transport evidence budget;
+- `stderr.log`: captured standard error, bounded by the transport evidence budget;
 - `final.md`: normalized final response selected by the adapter;
 - `meta.json`: invocation ID, monotonic invocation sequence, kind, attempt, status, round, stage,
-  participant, recording time, and normalized adapter execution metadata.
+  participant, recording time, normalized adapter execution metadata, and
+  `transport_truncated` / `transport_observed_chars` audit fields.
+
+For adapters whose stdout is authoritative, crossing the transport budget is an `output_limit`
+failure. Codex invocations with a separately managed final artifact instead keep draining the
+provider JSON stream after the evidence budget is full. Their retained logs are bounded,
+`transport_truncated` is true, and `transport_observed_chars` records the full decoded volume.
 
 The manifest indexes each invocation by ID, monotonic `invocation_sequence`, `kind`
 (`participant` or `judge_attempt`), attempt, status, round, stage, participant, path, recording

@@ -114,6 +114,12 @@ class AgentConfig(_ConfigModel):
         le=MAX_OUTPUT_CHARS,
         strict=True,
     )
+    max_final_output: int | None = Field(
+        default=None,
+        gt=0,
+        le=MAX_OUTPUT_CHARS,
+        strict=True,
+    )
     retries: int = Field(default=0, ge=0, le=5, strict=True)
     prompt_transport: PromptTransport | None = None
     prompt_flag: NonEmptyStr | None = None
@@ -194,9 +200,15 @@ class AgentConfig(_ConfigModel):
 
     @property
     def max_output_chars(self) -> int:
-        """Explicit unit-bearing alias for adapter protocols."""
+        """Character budget for captured stdout and stderr."""
 
         return self.max_output
+
+    @property
+    def max_final_output_chars(self) -> int:
+        """Character budget for an authoritative final-output artifact."""
+
+        return self.max_final_output if self.max_final_output is not None else self.max_output
 
 
 class ParticipantConfig(_ConfigModel):

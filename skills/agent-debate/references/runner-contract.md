@@ -19,7 +19,7 @@ The Skill runner is a deterministic adapter around the public
   "agents": ["codex_primary", "codex_alternative"],
   "stages": ["proposals", "critique", "revision"],
   "max_rounds": 3,
-  "max_elapsed_seconds": 900.0
+  "max_elapsed_seconds": 10800.0
 }
 ```
 

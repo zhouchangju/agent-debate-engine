@@ -13,7 +13,8 @@ agents:
     permission: read_only
     extra_args: []
     timeout: 300
-    max_output: 60000
+    max_output: 200000
+    max_final_output: 20000
     retries: 0
 
   codex_alternative:
@@ -22,7 +23,8 @@ agents:
     permission: read_only
     extra_args: []
     timeout: 300
-    max_output: 60000
+    max_output: 200000
+    max_final_output: 20000
     retries: 0
 
 workflow:

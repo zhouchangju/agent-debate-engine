@@ -26,7 +26,10 @@ def fake_cli(
     stdin: str | bytes | None = None,
     timeout_seconds: float = 2.0,
     max_output_chars: int = 1_000_000,
+    truncate_transport_output: bool = False,
+    allow_residual_process_cleanup: bool = False,
     terminate_grace_seconds: float = 0.05,
+    final_output_path: Path | None = None,
 ) -> CommandSpec:
     script = tmp_path / "fake_cli.py"
     script.write_text(source, encoding="utf-8")
@@ -40,7 +43,10 @@ def fake_cli(
         stdin=stdin,
         timeout_seconds=timeout_seconds,
         max_output_chars=max_output_chars,
+        truncate_transport_output=truncate_transport_output,
+        allow_residual_process_cleanup=allow_residual_process_cleanup,
         terminate_grace_seconds=terminate_grace_seconds,
+        final_output_path=final_output_path,
     )
 
 
@@ -194,6 +200,51 @@ async def test_successful_parent_with_background_child_is_failure_and_cleaned(
     assert not marker.exists()
 
 
+@pytest.mark.skipif(os.name != "posix", reason="process-group supervision is POSIX-only")
+async def test_managed_output_accepts_cleaned_background_child(tmp_path: Path) -> None:
+    ready = tmp_path / "background-child-ready"
+    marker = tmp_path / "background-child-survived"
+    child_source = (
+        "import signal, time\n"
+        "from pathlib import Path\n"
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+        f"Path({str(ready)!r}).write_text('ready')\n"
+        "time.sleep(0.7)\n"
+        f"Path({str(marker)!r}).write_text('survived')\n"
+        "time.sleep(60)\n"
+    )
+    spec = fake_cli(
+        tmp_path,
+        (
+            "import subprocess, sys, time\n"
+            "from pathlib import Path\n"
+            "subprocess.Popen(\n"
+            f"    [sys.executable, '-S', '-c', {child_source!r}],\n"
+            "    stdin=subprocess.DEVNULL,\n"
+            "    stdout=subprocess.DEVNULL,\n"
+            "    stderr=subprocess.DEVNULL,\n"
+            "    close_fds=True,\n"
+            ")\n"
+            "deadline = time.monotonic() + 2\n"
+            f"while not Path({str(ready)!r}).exists():\n"
+            "    if time.monotonic() >= deadline:\n"
+            "        raise RuntimeError('background child did not become ready')\n"
+            "    time.sleep(0.01)\n"
+            "print('parent finished')\n"
+        ),
+        allow_residual_process_cleanup=True,
+        terminate_grace_seconds=0.05,
+        final_output_path=tmp_path / "final.txt",
+    )
+
+    result = await run_process(spec)
+
+    assert result.exit_code == 0
+    assert result.stdout == "parent finished\n"
+    await asyncio.sleep(0.8)
+    assert not marker.exists()
+
+
 async def test_output_limit_is_failure_not_successful_truncation(tmp_path: Path) -> None:
     spec = fake_cli(
         tmp_path,
@@ -213,6 +264,47 @@ async def test_output_limit_is_failure_not_successful_truncation(tmp_path: Path)
     assert caught.value.limit == 100
     assert caught.value.observed > 100
     assert len(caught.value.stdout) <= 100
+
+
+async def test_transport_overflow_can_be_bounded_without_stopping_process(
+    tmp_path: Path,
+) -> None:
+    spec = fake_cli(
+        tmp_path,
+        "import sys\nsys.stdout.write('x' * 10000)\n",
+        max_output_chars=100,
+        truncate_transport_output=True,
+    )
+    streamed: list[str] = []
+
+    result = await run_process(
+        spec,
+        on_stream=lambda _stream, text: streamed.append(text),
+    )
+
+    assert result.exit_code == 0
+    assert result.stdout == "x" * 100
+    assert result.stderr == ""
+    assert result.transport_truncated is True
+    assert result.transport_observed_chars == 10_000
+    assert "".join(streamed) == result.stdout
+
+
+async def test_bounded_transport_metadata_survives_nonzero_exit(tmp_path: Path) -> None:
+    spec = fake_cli(
+        tmp_path,
+        "import sys\nsys.stdout.write('x' * 10000)\nraise SystemExit(7)\n",
+        max_output_chars=100,
+        truncate_transport_output=True,
+    )
+
+    with pytest.raises(ProcessExitError) as caught:
+        await run_process(spec)
+
+    assert caught.value.exit_code == 7
+    assert caught.value.stdout == "x" * 100
+    assert caught.value.transport_truncated is True
+    assert caught.value.transport_observed_chars == 10_000
 
 
 async def test_cancellation_terminates_process_group_and_propagates(

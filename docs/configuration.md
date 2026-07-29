@@ -22,9 +22,14 @@ Depth controls only bounded deliberation:
 
 | Depth | Minimum rounds | Maximum rounds | Stable decisions | Time budget |
 |---|---:|---:|---:|---:|
-| `quick` | 1 | 1 | 1 | 300 seconds |
-| `standard` | 1 | 3 | 1 | 900 seconds |
-| `deep` | 2 | 5 | 2 | 1,800 seconds |
+| `quick` | 1 | 1 | 1 | 3,600 seconds |
+| `standard` | 1 | 3 | 1 | 10,800 seconds |
+| `deep` | 2 | 5 | 2 | 21,600 seconds |
+
+Every bundled Codex participant has a one-hour per-attempt timeout. The larger run-level budgets
+preserve the existing depth ratios and leave sequential critique, revision, and Judge stages time
+after the parallel proposals finish. These values are ceilings; completed calls return
+immediately.
 
 The bundled Skill uses a unique output root per request, which lets an error response identify the
 request-owned run without selecting a potentially unrelated "newest" directory.
@@ -73,6 +78,7 @@ agents:
     extra_args: []
     timeout: 300
     max_output: 100000
+    max_final_output: 20000
     retries: 0
   codex_alternative:
     adapter: codex
@@ -82,6 +88,7 @@ agents:
     extra_args: []
     timeout: 300
     max_output: 100000
+    max_final_output: 20000
     retries: 0
 ```
 
@@ -95,7 +102,8 @@ agents:
 | `permission` | permission enum | `read_only` | Requested provider permission; see below. |
 | `extra_args` | list of strings | `[]` | Additional trusted argv for generic only; built-in adapters reject non-empty values. |
 | `timeout` | positive number | `300` | Per-attempt timeout in seconds. |
-| `max_output` | integer from 1 to 10000000 | `100000` | Maximum combined captured stdout and stderr in characters. |
+| `max_output` | integer from 1 to 10000000 | `100000` | Maximum combined captured stdout and stderr transport evidence in characters. Adapters without a separate authoritative output fail on overflow. Codex invocations using managed `-o` output keep draining but stop retaining transport text at this boundary and record the truncation. |
+| `max_final_output` | integer from 1 to 10000000, or null | inherits `max_output` | Maximum authoritative final-output artifact in characters when an adapter provides one. New templates set `20000`; omission preserves the legacy shared limit. |
 | `retries` | integer from 0 to 5 | `0` | Additional process attempts after an invocation failure. |
 
 `command` is an argv array so spaces and punctuation remain data. Do not write

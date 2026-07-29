@@ -9,6 +9,7 @@ import pytest
 
 from agent_debate.adapters import base as adapter_base
 from agent_debate.adapters.base import (
+    DEFAULT_MAX_FINAL_OUTPUT_CHARS,
     DEFAULT_MAX_OUTPUT_CHARS,
     DEFAULT_TIMEOUT_SECONDS,
     REDACTED_PROMPT,
@@ -18,6 +19,7 @@ from agent_debate.adapters.base import (
     provider_executable,
     redact_display_argv,
     reject_literal_credentials,
+    request_max_final_output,
     request_max_output,
     request_model,
     request_model_reasoning_effort,
@@ -57,6 +59,7 @@ def make_request(
         cwd=workspace,
         timeout_seconds=17.5,
         max_output_chars=12_345,
+        max_final_output_chars=2_345,
         model=model,
         model_reasoning_effort=model_reasoning_effort,
         reasoning_effort=reasoning_effort,
@@ -171,6 +174,9 @@ def test_codex_0145_orders_model_and_managed_artifact_args(
     assert spec.final_output_path == final_path
     assert spec.timeout_seconds == 17.5
     assert spec.max_output_chars == 12_345
+    assert spec.max_final_output_chars == 2_345
+    assert spec.truncate_transport_output is True
+    assert spec.allow_residual_process_cleanup is True
 
 
 def test_codex_0145_uses_adapter_defaults_when_model_is_missing(
@@ -666,7 +672,7 @@ async def test_codex_execute_fails_when_requested_final_output_is_missing(
     tmp_path: Path,
 ) -> None:
     fake_codex = tmp_path / "fake_codex.py"
-    make_fake_executable(fake_codex, "print('success without artifact')\n")
+    make_fake_executable(fake_codex, "import sys\nsys.stdout.write('t' * 20_000)\n")
     request = make_request(
         tmp_path,
         final_output_path=tmp_path / "missing.txt",
@@ -676,8 +682,11 @@ async def test_codex_execute_fails_when_requested_final_output_is_missing(
         command=(str(fake_codex),),
     )
 
-    with pytest.raises(FinalOutputError, match="did not produce or refresh"):
+    with pytest.raises(FinalOutputError, match="did not produce or refresh") as caught:
         await CodexAdapter().execute(request, config)
+
+    assert caught.value.transport_truncated is True
+    assert caught.value.transport_observed_chars == 20_000
 
 
 async def test_codex_execute_does_not_follow_final_output_symlink(tmp_path: Path) -> None:
@@ -802,8 +811,40 @@ async def test_codex_final_output_file_obeys_character_limit(tmp_path: Path) -> 
         await CodexAdapter().execute(request, config)
 
     assert caught.value.stream == "final"
-    assert caught.value.limit == request.max_output_chars
+    assert caught.value.limit == request.max_final_output_chars
     assert caught.value.exit_code == 0
+    assert caught.value.transport_truncated is False
+    assert caught.value.transport_observed_chars == 0
+
+
+async def test_codex_transport_and_final_output_use_independent_limits(
+    tmp_path: Path,
+) -> None:
+    fake_codex = tmp_path / "fake_codex.py"
+    make_fake_executable(
+        fake_codex,
+        (
+            "import pathlib, sys\n"
+            "output_path = pathlib.Path(sys.argv[sys.argv.index('-o') + 1])\n"
+            "sys.stdout.write('t' * 20_000)\n"
+            "output_path.write_text('bounded final', encoding='utf-8')\n"
+        ),
+    )
+    request = make_request(
+        tmp_path,
+        final_output_path=tmp_path / "final.txt",
+    )
+    config = AgentConfig(
+        adapter=AdapterKind.CODEX,
+        command=(str(fake_codex),),
+    )
+
+    result = await CodexAdapter().execute(request, config)
+
+    assert len(result.stdout) == request.max_output_chars
+    assert result.transport_truncated is True
+    assert result.transport_observed_chars == 20_000
+    assert result.final_text == "bounded final"
 
 
 @pytest.mark.parametrize(
@@ -818,6 +859,11 @@ async def test_codex_final_output_file_obeys_character_limit(tmp_path: Path) -> 
         {"timeout_seconds": float("inf")},
         {"max_output_chars": 0},
         {"max_output_chars": 1.5},
+        {"max_final_output_chars": 0},
+        {"max_final_output_chars": 1.5},
+        {"truncate_transport_output": 1},
+        {"allow_residual_process_cleanup": 1},
+        {"allow_residual_process_cleanup": True},
         {"terminate_grace_seconds": -0.1},
         {"terminate_grace_seconds": float("nan")},
         {"terminate_grace_seconds": float("inf")},
@@ -906,6 +952,7 @@ def test_structural_request_helpers_cover_fallbacks(tmp_path: Path) -> None:
         executable="wrapped-agent",
         timeout=12.5,
         max_output=321,
+        max_final_output=123,
         model="fallback-model",
         model_reasoning_effort="config-model-effort",
         reasoning_effort="config-reasoning-effort",
@@ -942,6 +989,15 @@ def test_structural_request_helpers_cover_fallbacks(tmp_path: Path) -> None:
     assert request_timeout(empty_request, fallback_config) == 12.5
     assert request_max_output(empty_request, None) == DEFAULT_MAX_OUTPUT_CHARS
     assert request_max_output(empty_request, fallback_config) == 321
+    assert request_max_final_output(empty_request, None) == DEFAULT_MAX_FINAL_OUTPUT_CHARS
+    assert request_max_final_output(empty_request, fallback_config) == 123
+    assert (
+        request_max_final_output(
+            empty_request,
+            SimpleNamespace(max_output=321, max_final_output=None),
+        )
+        == 321
+    )
     assert request_model(empty_request, fallback_config) == "fallback-model"
     assert request_model_reasoning_effort(empty_request, fallback_config) == "config-model-effort"
     assert request_reasoning_effort(empty_request, fallback_config) == "config-reasoning-effort"

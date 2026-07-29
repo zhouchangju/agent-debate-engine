@@ -55,6 +55,7 @@ class _FixtureAdapter(BaseAdapter):
             stdin=request.prompt,
             timeout_seconds=request.timeout_seconds,
             max_output_chars=request.max_output_chars,
+            max_final_output_chars=request.max_final_output_chars,
         )
 
 
@@ -301,6 +302,11 @@ async def test_engine_preserves_stage_dependencies_and_artifacts(tmp_path: Path)
         )
     ]
     assert evidence_positions == sorted(evidence_positions)
+    proposal_meta = json.loads(
+        invocation_file("proposals", "proposal-a", "meta.json").read_text(encoding="utf-8")
+    )
+    assert proposal_meta["transport_truncated"] is False
+    assert proposal_meta["transport_observed_chars"] > 0
     assert not (result.run_dir / ".provider-output").exists()
     assert _SCRATCH_OBSERVATIONS
     _assert_private_scratch_observations(tmp_path)

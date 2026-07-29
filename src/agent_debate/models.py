@@ -160,6 +160,7 @@ class AgentRequest(StrictModel):
     stage_id: SafeId | None = None
     timeout_seconds: FiniteFloat = Field(default=300.0, gt=0, strict=True)
     max_output_chars: int = Field(default=100_000, gt=0, strict=True)
+    max_final_output_chars: int = Field(default=20_000, gt=0, strict=True)
     model: NonEmptyText | None = None
     model_reasoning_effort: NonEmptyText | None = None
     reasoning_effort: NonEmptyText | None = None
@@ -232,6 +233,8 @@ class AgentResult(StrictModel):
     duration_seconds: FiniteFloat = Field(ge=0, strict=True)
     timed_out: bool = Field(strict=True)
     truncated: bool = Field(strict=True)
+    transport_truncated: bool = Field(default=False, strict=True)
+    transport_observed_chars: int = Field(default=0, ge=0, strict=True)
     display_command: tuple[str, ...] = Field(min_length=1)
     input_hash: Sha256Hex
     output_hash: Sha256Hex
@@ -274,6 +277,12 @@ class AgentResult(StrictModel):
             raise ValueError("a successful invocation must have non-empty final_output")
         if self.truncated != (self.status is InvocationStatus.OUTPUT_LIMIT):
             raise ValueError("truncated must be true exactly when status is output_limit")
+        captured_transport_chars = len(self.stdout) + len(self.stderr)
+        if self.transport_truncated and self.transport_observed_chars <= captured_transport_chars:
+            raise ValueError(
+                "transport_observed_chars must exceed captured transport output "
+                "when transport_truncated is true"
+            )
         return self
 
 

@@ -11,6 +11,7 @@ from agent_debate.adapters.base import (
     redact_display_argv,
     reject_provider_extra_args,
     request_extra_args,
+    request_max_final_output,
     request_max_output,
     request_model,
     request_model_reasoning_effort,
@@ -103,13 +104,15 @@ class CodexAdapter(BaseAdapter):
             stdin=request.prompt,
             timeout_seconds=request_timeout(request, agent_config),
             max_output_chars=request_max_output(request, agent_config),
+            max_final_output_chars=request_max_final_output(request, agent_config),
+            truncate_transport_output=final_output_path is not None,
+            allow_residual_process_cleanup=final_output_path is not None,
             final_output_path=final_output_path,
             provider_adapter=self.name,
             provider_model=model,
             session_mode="fresh",
             session_enforcement=(
-                "codex exec --ephemeral; provider session files are not persisted "
-                "or resumed"
+                "codex exec --ephemeral; provider session files are not persisted or resumed"
             ),
         )
 

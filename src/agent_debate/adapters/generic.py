@@ -99,9 +99,7 @@ class GenericAdapter(BaseAdapter):
             provider_adapter=self.name,
             provider_model=request_model(request, agent_config),
             session_mode="unverified",
-            session_enforcement=(
-                "generic adapter cannot prove provider-level session isolation"
-            ),
+            session_enforcement=("generic adapter cannot prove provider-level session isolation"),
         )
 
     def _resolve_command(

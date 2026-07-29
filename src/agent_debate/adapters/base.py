@@ -32,6 +32,7 @@ REDACTED_PROMPT = "<prompt:redacted>"
 REDACTED_CREDENTIAL = "<credential:redacted>"
 DEFAULT_TIMEOUT_SECONDS = 300.0
 DEFAULT_MAX_OUTPUT_CHARS = 100_000
+DEFAULT_MAX_FINAL_OUTPUT_CHARS = 20_000
 _FINAL_OUTPUT_READ_CHARS = 64 * 1024
 _CREDENTIAL_OPTION_NAMES = frozenset(
     {
@@ -97,6 +98,9 @@ class AgentRequestLike(Protocol):
     def max_output_chars(self) -> int: ...
 
     @property
+    def max_final_output_chars(self) -> int: ...
+
+    @property
     def model(self) -> str | None: ...
 
     @property
@@ -147,6 +151,9 @@ class AgentConfigLike(Protocol):
     def max_output(self) -> int: ...
 
     @property
+    def max_final_output(self) -> int | None: ...
+
+    @property
     def prompt_transport(self) -> object: ...
 
     @property
@@ -163,6 +170,9 @@ class CommandSpec:
     stdin: str | bytes | None = None
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
     max_output_chars: int = DEFAULT_MAX_OUTPUT_CHARS
+    max_final_output_chars: int = DEFAULT_MAX_FINAL_OUTPUT_CHARS
+    truncate_transport_output: bool = False
+    allow_residual_process_cleanup: bool = False
     terminate_grace_seconds: float = 2.0
     final_output_path: Path | None = None
     env: Mapping[str, str] | None = None
@@ -183,12 +193,7 @@ class CommandSpec:
         _ensure_display_argv_redacts_credentials(self.argv, self.display_argv)
         if not math.isfinite(self.timeout_seconds) or self.timeout_seconds <= 0:
             raise ConfigError("timeout_seconds must be finite and greater than zero")
-        if (
-            isinstance(self.max_output_chars, bool)
-            or not isinstance(self.max_output_chars, int)
-            or self.max_output_chars <= 0
-        ):
-            raise ConfigError("max_output_chars must be a positive integer")
+        _validate_output_contract(self)
         if not math.isfinite(self.terminate_grace_seconds) or self.terminate_grace_seconds < 0:
             raise ConfigError("terminate_grace_seconds must be finite and non-negative")
         if not self.provider_adapter or "\x00" in self.provider_adapter:
@@ -211,6 +216,21 @@ class CommandSpec:
         """Compatibility alias that makes the payload nature explicit."""
 
         return self.stdin
+
+
+def _validate_output_contract(spec: CommandSpec) -> None:
+    for name, value in (
+        ("max_output_chars", spec.max_output_chars),
+        ("max_final_output_chars", spec.max_final_output_chars),
+    ):
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ConfigError(f"{name} must be a positive integer")
+    if type(spec.truncate_transport_output) is not bool:
+        raise ConfigError("truncate_transport_output must be a boolean")
+    if type(spec.allow_residual_process_cleanup) is not bool:
+        raise ConfigError("allow_residual_process_cleanup must be a boolean")
+    if spec.allow_residual_process_cleanup and spec.final_output_path is None:
+        raise ConfigError("allow_residual_process_cleanup requires final_output_path")
 
 
 @runtime_checkable
@@ -274,7 +294,7 @@ class BaseAdapter(ABC):
             final_text, observed_chars, current_final_output = await asyncio.to_thread(
                 _read_bounded_text,
                 spec.final_output_path,
-                spec.max_output_chars,
+                spec.max_final_output_chars,
             )
         except FileNotFoundError as exc:
             raise FinalOutputError(
@@ -285,6 +305,8 @@ class BaseAdapter(ABC):
                 stdout=result.stdout,
                 stderr=result.stderr,
                 exit_code=result.exit_code,
+                transport_truncated=result.transport_truncated,
+                transport_observed_chars=result.transport_observed_chars,
             ) from exc
         except (OSError, UnicodeError) as exc:
             raise FinalOutputError(
@@ -295,6 +317,8 @@ class BaseAdapter(ABC):
                 stdout=result.stdout,
                 stderr=result.stderr,
                 exit_code=result.exit_code,
+                transport_truncated=result.transport_truncated,
+                transport_observed_chars=result.transport_observed_chars,
             ) from exc
 
         if current_final_output == previous_final_output:
@@ -306,17 +330,21 @@ class BaseAdapter(ABC):
                 stdout=result.stdout,
                 stderr=result.stderr,
                 exit_code=result.exit_code,
+                transport_truncated=result.transport_truncated,
+                transport_observed_chars=result.transport_observed_chars,
             )
 
-        if observed_chars > spec.max_output_chars:
+        if observed_chars > spec.max_final_output_chars:
             raise ProcessOutputLimitError(
-                limit=spec.max_output_chars,
+                limit=spec.max_final_output_chars,
                 observed=observed_chars,
                 stream="final",
                 display_argv=spec.display_argv,
                 stdout=result.stdout,
                 stderr=result.stderr,
                 exit_code=result.exit_code,
+                transport_truncated=result.transport_truncated,
+                transport_observed_chars=result.transport_observed_chars,
             )
         return replace(result, final_text=final_text)
 
@@ -333,6 +361,8 @@ class FinalOutputError(AgentExecutionError):
         stdout: str,
         stderr: str,
         exit_code: int,
+        transport_truncated: bool,
+        transport_observed_chars: int,
     ) -> None:
         super().__init__(message)
         self.path = path
@@ -340,6 +370,8 @@ class FinalOutputError(AgentExecutionError):
         self.stdout = stdout
         self.stderr = stderr
         self.exit_code = exit_code
+        self.transport_truncated = transport_truncated
+        self.transport_observed_chars = transport_observed_chars
 
 
 _FileSnapshot = tuple[int, int, int, int, int, int, int]
@@ -494,6 +526,22 @@ def request_max_output(
         value = getattr(agent_config, "max_output", None)
     if value is None:
         return DEFAULT_MAX_OUTPUT_CHARS
+    return int(value)
+
+
+def request_max_final_output(
+    request: AgentRequestLike,
+    agent_config: AgentConfigLike | None,
+) -> int:
+    """Resolve the authoritative final-output character ceiling."""
+
+    value = getattr(request, "max_final_output_chars", None)
+    if value is None and agent_config is not None:
+        value = getattr(agent_config, "max_final_output", None)
+        if value is None:
+            value = getattr(agent_config, "max_output", None)
+    if value is None:
+        return DEFAULT_MAX_FINAL_OUTPUT_CHARS
     return int(value)
 
 

@@ -37,6 +37,7 @@ def _valid_data() -> dict[str, Any]:
                 "permission": "read_only",
                 "timeout": 30,
                 "max_output": 20_000,
+                "max_final_output": 4_000,
                 "retries": 0,
             },
             "judge": {
@@ -118,6 +119,8 @@ def test_load_config_resolves_every_path_relative_to_yaml(
     assert participant.prompt == (config_dir / "prompts/architect.md").resolve()
     assert config.workflow.judge.prompt == (config_dir / "prompts/judge.md").resolve()
     assert config.agents["primary"].model is None
+    assert config.agents["primary"].max_output_chars == 20_000
+    assert config.agents["primary"].max_final_output_chars == 4_000
 
 
 def test_resolved_config_has_canonical_json_serialization(tmp_path: Path) -> None:
@@ -130,6 +133,20 @@ def test_resolved_config_has_canonical_json_serialization(tmp_path: Path) -> Non
     assert dumped["agents"]["judge"]["permission"] == "workspace_write"
     assert dumped["agents"]["judge"]["command"] == ["judge-cli"]
     assert "timeout_seconds" not in dumped["agents"]["primary"]
+
+
+def test_legacy_max_output_remains_the_final_output_fallback() -> None:
+    config = AgentConfig.model_validate(
+        {
+            "adapter": "codex",
+            "command": ["codex"],
+            "max_output": 7_000,
+        }
+    )
+
+    assert config.max_final_output is None
+    assert config.max_output_chars == 7_000
+    assert config.max_final_output_chars == 7_000
 
 
 def test_unknown_nested_keys_are_rejected(tmp_path: Path) -> None:

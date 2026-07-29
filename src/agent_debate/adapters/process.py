@@ -31,6 +31,8 @@ class ProcessResult:
     exit_code: int
     duration_seconds: float
     final_text: str | None = None
+    transport_truncated: bool = False
+    transport_observed_chars: int = 0
 
     @property
     def returncode(self) -> int:
@@ -62,12 +64,16 @@ class ProcessExecutionError(AgentExecutionError):
         stdout: str = "",
         stderr: str = "",
         exit_code: int | None = None,
+        transport_truncated: bool = False,
+        transport_observed_chars: int = 0,
     ) -> None:
         super().__init__(message)
         self.display_argv = display_argv
         self.stdout = stdout
         self.stderr = stderr
         self.exit_code = exit_code
+        self.transport_truncated = transport_truncated
+        self.transport_observed_chars = transport_observed_chars
 
     @property
     def returncode(self) -> int | None:
@@ -105,6 +111,8 @@ class ProcessResidualGroupError(ProcessExecutionError):
         stdout: str = "",
         stderr: str = "",
         exit_code: int | None = None,
+        transport_truncated: bool = False,
+        transport_observed_chars: int = 0,
     ) -> None:
         cleanup_status = (
             "the residual process group was terminated"
@@ -118,6 +126,8 @@ class ProcessResidualGroupError(ProcessExecutionError):
             stdout=stdout,
             stderr=stderr,
             exit_code=exit_code,
+            transport_truncated=transport_truncated,
+            transport_observed_chars=transport_observed_chars,
         )
         self.process_group = process_group
         self.cleanup_succeeded = cleanup_succeeded
@@ -134,6 +144,8 @@ class ProcessTimeoutError(ProcessExecutionError):
         stdout: str = "",
         stderr: str = "",
         exit_code: int | None = None,
+        transport_truncated: bool = False,
+        transport_observed_chars: int = 0,
     ) -> None:
         super().__init__(
             f"Agent process timed out after {timeout_seconds:g} seconds: "
@@ -142,6 +154,8 @@ class ProcessTimeoutError(ProcessExecutionError):
             stdout=stdout,
             stderr=stderr,
             exit_code=exit_code,
+            transport_truncated=transport_truncated,
+            transport_observed_chars=transport_observed_chars,
         )
         self.timeout_seconds = timeout_seconds
 
@@ -159,6 +173,8 @@ class ProcessOutputLimitError(ProcessExecutionError):
         stdout: str = "",
         stderr: str = "",
         exit_code: int | None = None,
+        transport_truncated: bool = False,
+        transport_observed_chars: int = 0,
     ) -> None:
         super().__init__(
             f"Agent {stream} output exceeded the {limit} character limit "
@@ -167,6 +183,8 @@ class ProcessOutputLimitError(ProcessExecutionError):
             stdout=stdout,
             stderr=stderr,
             exit_code=exit_code,
+            transport_truncated=transport_truncated,
+            transport_observed_chars=transport_observed_chars,
         )
         self.limit = limit
         self.observed = observed
@@ -177,18 +195,27 @@ class ProcessOutputLimitError(ProcessExecutionError):
 class _OutputBudget:
     limit: int
     display_argv: tuple[str, ...]
-    used: int = 0
+    truncate: bool = False
+    captured: int = 0
+    observed: int = 0
+    truncated: bool = False
 
-    def consume(self, text: str, *, stream: StreamName) -> None:
-        observed = self.used + len(text)
-        if observed > self.limit:
+    def consume(self, text: str, *, stream: StreamName) -> str:
+        self.observed += len(text)
+        remaining = max(0, self.limit - self.captured)
+        if len(text) > remaining and not self.truncate:
             raise ProcessOutputLimitError(
                 limit=self.limit,
-                observed=observed,
+                observed=self.observed,
                 stream=stream,
                 display_argv=self.display_argv,
+                transport_truncated=True,
+                transport_observed_chars=self.observed,
             )
-        self.used = observed
+        captured = text[:remaining]
+        self.captured += len(captured)
+        self.truncated = self.truncated or len(captured) < len(text)
+        return captured
 
 
 async def run_process(
@@ -198,9 +225,11 @@ async def run_process(
 ) -> ProcessResult:
     """Run an argv directly, draining both output pipes without deadlock.
 
-    Timeout, caller cancellation, and output-limit failure all terminate the
+    Timeout, caller cancellation, and strict output-limit failure terminate the
     dedicated process group with TERM, wait for the configured grace period,
-    then use KILL if any member remains.
+    then use KILL if any member remains. Adapters with an authoritative final
+    artifact may instead bound captured transport output while continuing to
+    drain the process pipes.
     """
 
     started = asyncio.get_running_loop().time()
@@ -227,7 +256,11 @@ async def run_process(
         await _terminate_process_group(process, grace_seconds=spec.terminate_grace_seconds)
         raise RuntimeError("asyncio did not create the requested output pipes")
 
-    budget = _OutputBudget(limit=spec.max_output_chars, display_argv=spec.display_argv)
+    budget = _OutputBudget(
+        limit=spec.max_output_chars,
+        display_argv=spec.display_argv,
+        truncate=spec.truncate_transport_output,
+    )
     stdout_chunks: list[str] = []
     stderr_chunks: list[str] = []
     stdout_task = asyncio.create_task(
@@ -278,6 +311,8 @@ async def run_process(
             stdout="".join(stdout_chunks),
             stderr="".join(stderr_chunks),
             exit_code=process.returncode,
+            transport_truncated=budget.truncated,
+            transport_observed_chars=budget.observed,
         ) from exc
     except ProcessOutputLimitError as exc:
         await _abort_process(
@@ -293,6 +328,8 @@ async def run_process(
             stdout="".join(stdout_chunks),
             stderr="".join(stderr_chunks),
             exit_code=process.returncode,
+            transport_truncated=True,
+            transport_observed_chars=budget.observed,
         ) from exc
     except asyncio.CancelledError:
         await asyncio.shield(
@@ -320,14 +357,17 @@ async def run_process(
             process,
             grace_seconds=spec.terminate_grace_seconds,
         )
-        raise ProcessResidualGroupError(
-            process_group=process.pid,
-            cleanup_succeeded=cleanup_succeeded,
-            display_argv=spec.display_argv,
-            stdout=stdout,
-            stderr=stderr,
-            exit_code=exit_code,
-        )
+        if not (exit_code == 0 and cleanup_succeeded and spec.allow_residual_process_cleanup):
+            raise ProcessResidualGroupError(
+                process_group=process.pid,
+                cleanup_succeeded=cleanup_succeeded,
+                display_argv=spec.display_argv,
+                stdout=stdout,
+                stderr=stderr,
+                exit_code=exit_code,
+                transport_truncated=budget.truncated,
+                transport_observed_chars=budget.observed,
+            )
     if exit_code != 0:
         raise ProcessExitError(
             f"Agent process exited with status {exit_code}: {_display_command(spec.display_argv)}",
@@ -335,12 +375,16 @@ async def run_process(
             stdout=stdout,
             stderr=stderr,
             exit_code=exit_code,
+            transport_truncated=budget.truncated,
+            transport_observed_chars=budget.observed,
         )
     return ProcessResult(
         stdout=stdout,
         stderr=stderr,
         exit_code=exit_code,
         duration_seconds=duration,
+        transport_truncated=budget.truncated,
+        transport_observed_chars=budget.observed,
     )
 
 
@@ -356,15 +400,17 @@ async def _drain_stream(
     while raw_chunk := await reader.read(_READ_CHUNK_BYTES):
         text = decoder.decode(raw_chunk, final=False)
         if text:
-            budget.consume(text, stream=stream)
-            chunks.append(text)
-            await _notify_stream(on_stream, stream=stream, text=text)
+            captured = budget.consume(text, stream=stream)
+            if captured:
+                chunks.append(captured)
+                await _notify_stream(on_stream, stream=stream, text=captured)
 
     final_text = decoder.decode(b"", final=True)
     if final_text:
-        budget.consume(final_text, stream=stream)
-        chunks.append(final_text)
-        await _notify_stream(on_stream, stream=stream, text=final_text)
+        captured = budget.consume(final_text, stream=stream)
+        if captured:
+            chunks.append(captured)
+            await _notify_stream(on_stream, stream=stream, text=captured)
 
 
 async def _notify_stream(

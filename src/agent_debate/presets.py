@@ -34,21 +34,21 @@ _DEPTH_SETTINGS = {
         min_rounds=1,
         max_rounds=1,
         stable_rounds=1,
-        max_elapsed_seconds=300.0,
+        max_elapsed_seconds=3_600.0,
         keep_recent_rounds=1,
     ),
     DebateDepth.STANDARD: _DepthSettings(
         min_rounds=1,
         max_rounds=3,
         stable_rounds=1,
-        max_elapsed_seconds=900.0,
+        max_elapsed_seconds=10_800.0,
         keep_recent_rounds=2,
     ),
     DebateDepth.DEEP: _DepthSettings(
         min_rounds=2,
         max_rounds=5,
         stable_rounds=2,
-        max_elapsed_seconds=1_800.0,
+        max_elapsed_seconds=21_600.0,
         keep_recent_rounds=3,
     ),
 }
@@ -56,6 +56,7 @@ _DEPTH_SETTINGS = {
 
 DEFAULT_CODEX_MODEL = "gpt-5.6-sol"
 DEFAULT_CODEX_REASONING_EFFORT = "medium"
+TECHNICAL_REVIEW_AGENT_TIMEOUT_SECONDS = 3_600.0
 
 
 def build_technical_review_config(
@@ -102,8 +103,9 @@ def build_technical_review_config(
                 "model_reasoning_effort": DEFAULT_CODEX_REASONING_EFFORT,
                 "permission": "read_only",
                 "extra_args": [],
-                "timeout": 300.0,
-                "max_output": 60_000,
+                "timeout": TECHNICAL_REVIEW_AGENT_TIMEOUT_SECONDS,
+                "max_output": 200_000,
+                "max_final_output": 20_000,
                 "retries": 0,
             },
             "codex_alternative": {
@@ -113,8 +115,9 @@ def build_technical_review_config(
                 "model_reasoning_effort": DEFAULT_CODEX_REASONING_EFFORT,
                 "permission": "read_only",
                 "extra_args": [],
-                "timeout": 300.0,
-                "max_output": 60_000,
+                "timeout": TECHNICAL_REVIEW_AGENT_TIMEOUT_SECONDS,
+                "max_output": 200_000,
+                "max_final_output": 20_000,
                 "retries": 0,
             },
         },

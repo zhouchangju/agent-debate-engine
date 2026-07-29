@@ -28,7 +28,7 @@ def test_plan_emits_safe_machine_contract(
     assert payload == {
         "agents": ["codex_primary", "codex_alternative"],
         "depth": "standard",
-        "max_elapsed_seconds": 900.0,
+        "max_elapsed_seconds": 10_800.0,
         "max_rounds": 3,
         "mode": "plan",
         "ok": True,

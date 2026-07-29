@@ -15,6 +15,7 @@ agents:
     permission: read_only
     timeout: 600
     max_output: 100000
+    max_final_output: 20000
     retries: 0
 
   kimi_alternative:
@@ -25,6 +26,7 @@ agents:
     permission: danger_full_access
     timeout: 600
     max_output: 100000
+    max_final_output: 20000
     retries: 0
 
   codex_critic:
@@ -35,6 +37,7 @@ agents:
     permission: read_only
     timeout: 600
     max_output: 100000
+    max_final_output: 20000
     retries: 0
 
   kimi_reviewer:
@@ -45,6 +48,7 @@ agents:
     permission: danger_full_access
     timeout: 600
     max_output: 100000
+    max_final_output: 20000
     retries: 0
 
   codex_judge:
@@ -55,6 +59,7 @@ agents:
     permission: read_only
     timeout: 600
     max_output: 100000
+    max_final_output: 20000
     retries: 0
 
 workflow:

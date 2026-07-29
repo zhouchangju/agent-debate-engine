@@ -142,8 +142,7 @@ class KimiAdapter(BaseAdapter):
             provider_model=model,
             session_mode="fresh",
             session_enforcement=(
-                "new Kimi prompt session; adapter forbids --session/-S and "
-                "--continue/-c"
+                "new Kimi prompt session; adapter forbids --session/-S and --continue/-c"
             ),
         )
 
