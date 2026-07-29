@@ -1,0 +1,1693 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07110f">
+  <title>Agent Debate Engine｜项目讲解</title>
+  <style>
+    /* ===========================================
+       VIEWPORT FITTING: MANDATORY BASE STYLES
+       Include this ENTIRE file in every presentation.
+       These styles ensure slides fit exactly in the viewport.
+       =========================================== */
+
+    /* 1. Lock html/body to viewport */
+    html, body {
+        height: 100%;
+        overflow-x: hidden;
+    }
+
+    html {
+        scroll-snap-type: y mandatory;
+        scroll-behavior: smooth;
+    }
+
+    /* 2. Each slide = exact viewport height */
+    .slide {
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh; /* Dynamic viewport height for mobile browsers */
+        overflow: hidden; /* CRITICAL: Prevent ANY overflow */
+        scroll-snap-align: start;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+    }
+
+    /* 3. Content container with flex for centering */
+    .slide-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        max-height: 100%;
+        overflow: hidden; /* Double-protection against overflow */
+        padding: var(--slide-padding);
+    }
+
+    /* 4. ALL typography uses clamp() for responsive scaling */
+    :root {
+        /* Titles scale from mobile to desktop */
+        --title-size: clamp(1.5rem, 5vw, 4rem);
+        --h2-size: clamp(1.25rem, 3.5vw, 2.5rem);
+        --h3-size: clamp(1rem, 2.5vw, 1.75rem);
+
+        /* Body text */
+        --body-size: clamp(0.75rem, 1.5vw, 1.125rem);
+        --small-size: clamp(0.65rem, 1vw, 0.875rem);
+
+        /* Spacing scales with viewport */
+        --slide-padding: clamp(1rem, 4vw, 4rem);
+        --content-gap: clamp(0.5rem, 2vw, 2rem);
+        --element-gap: clamp(0.25rem, 1vw, 1rem);
+    }
+
+    /* 5. Cards/containers use viewport-relative max sizes */
+    .card, .container, .content-box {
+        max-width: min(90vw, 1000px);
+        max-height: min(80vh, 700px);
+    }
+
+    /* 6. Lists auto-scale with viewport */
+    .feature-list, .bullet-list {
+        gap: clamp(0.4rem, 1vh, 1rem);
+    }
+
+    .feature-list li, .bullet-list li {
+        font-size: var(--body-size);
+        line-height: 1.4;
+    }
+
+    /* 7. Grids adapt to available space */
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+        gap: clamp(0.5rem, 1.5vw, 1rem);
+    }
+
+    /* 8. Images constrained to viewport */
+    img, .image-container {
+        max-width: 100%;
+        max-height: min(50vh, 400px);
+        object-fit: contain;
+    }
+
+    /* ===========================================
+       RESPONSIVE BREAKPOINTS
+       Aggressive scaling for smaller viewports
+       =========================================== */
+
+    /* Short viewports (< 700px height) */
+    @media (max-height: 700px) {
+        :root {
+            --slide-padding: clamp(0.75rem, 3vw, 2rem);
+            --content-gap: clamp(0.4rem, 1.5vw, 1rem);
+            --title-size: clamp(1.25rem, 4.5vw, 2.5rem);
+            --h2-size: clamp(1rem, 3vw, 1.75rem);
+        }
+    }
+
+    /* Very short viewports (< 600px height) */
+    @media (max-height: 600px) {
+        :root {
+            --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+            --content-gap: clamp(0.3rem, 1vw, 0.75rem);
+            --title-size: clamp(1.1rem, 4vw, 2rem);
+            --body-size: clamp(0.7rem, 1.2vw, 0.95rem);
+        }
+
+        /* Hide non-essential elements */
+        .nav-dots, .keyboard-hint, .decorative {
+            display: none;
+        }
+    }
+
+    /* Extremely short (landscape phones, < 500px height) */
+    @media (max-height: 500px) {
+        :root {
+            --slide-padding: clamp(0.4rem, 2vw, 1rem);
+            --title-size: clamp(1rem, 3.5vw, 1.5rem);
+            --h2-size: clamp(0.9rem, 2.5vw, 1.25rem);
+            --body-size: clamp(0.65rem, 1vw, 0.85rem);
+        }
+    }
+
+    /* Narrow viewports (< 600px width) */
+    @media (max-width: 600px) {
+        :root {
+            --title-size: clamp(1.25rem, 7vw, 2.5rem);
+        }
+
+        /* Stack grids vertically */
+        .grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* ===========================================
+       REDUCED MOTION
+       Respect user preferences
+       =========================================== */
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            transition-duration: 0.2s !important;
+        }
+
+        html {
+            scroll-behavior: auto;
+        }
+    }
+
+    /* ---------- Design system ---------- */
+    :root {
+      --ink: #07110f;
+      --ink-2: #0b1915;
+      --paper: #f2eddf;
+      --paper-muted: #a8b8b1;
+      --mint: #4dffc3;
+      --mint-soft: rgba(77, 255, 195, 0.12);
+      --coral: #ff6962;
+      --amber: #f3cc64;
+      --line: rgba(242, 237, 223, 0.18);
+      --line-strong: rgba(242, 237, 223, 0.34);
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      --serif: "Songti SC", "STSong", "SimSun", serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--paper);
+      background: var(--ink);
+      font-family: var(--sans);
+      font-size: var(--body-size);
+      line-height: 1.55;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .slide {
+      isolation: isolate;
+      background:
+        radial-gradient(circle at 84% 16%, rgba(77, 255, 195, 0.08), transparent 28%),
+        linear-gradient(135deg, #07110f 0%, #0b1915 54%, #07110f 100%);
+    }
+
+    .slide::before {
+      position: absolute;
+      z-index: -2;
+      inset: 0;
+      content: "";
+      background-image:
+        linear-gradient(rgba(242, 237, 223, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(242, 237, 223, 0.035) 1px, transparent 1px);
+      background-size: clamp(2.5rem, 5vw, 5rem) clamp(2.5rem, 5vw, 5rem);
+      mask-image: linear-gradient(to bottom, black, transparent 82%);
+    }
+
+    .slide::after {
+      position: absolute;
+      z-index: -1;
+      inset: clamp(0.65rem, 1.4vw, 1.25rem);
+      border: 1px solid var(--line);
+      content: "";
+      pointer-events: none;
+    }
+
+    .slide-content {
+      width: min(100%, 1440px);
+      margin-inline: auto;
+      gap: var(--content-gap);
+    }
+
+    .eyebrow,
+    .case-id,
+    .micro-label,
+    .slide-number,
+    .tag,
+    .step-index {
+      font-family: var(--mono);
+      font-size: var(--small-size);
+      font-weight: 600;
+      letter-spacing: clamp(0.05em, 0.16vw, 0.14em);
+      text-transform: uppercase;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: clamp(0.5rem, 1vw, 0.9rem);
+      color: var(--mint);
+    }
+
+    .eyebrow::before {
+      width: clamp(1.5rem, 4vw, 4rem);
+      height: 2px;
+      background: currentColor;
+      content: "";
+    }
+
+    .slide-number {
+      position: absolute;
+      right: clamp(1.15rem, 2.4vw, 2.5rem);
+      bottom: clamp(0.9rem, 1.8vw, 1.75rem);
+      color: var(--paper-muted);
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    h1, h2 {
+      font-family: var(--serif);
+      font-weight: 900;
+      letter-spacing: clamp(-0.04em, -0.1vw, -0.01em);
+      line-height: 1.08;
+      text-wrap: balance;
+    }
+
+    h1 {
+      max-width: min(90vw, 1050px);
+      font-size: var(--title-size);
+    }
+
+    h2 {
+      max-width: min(90vw, 980px);
+      font-size: var(--h2-size);
+    }
+
+    h3 {
+      font-size: var(--h3-size);
+      line-height: 1.25;
+    }
+
+    .lead {
+      max-width: min(90vw, 860px);
+      color: var(--paper-muted);
+      font-size: clamp(0.88rem, 1.7vw, 1.3rem);
+      line-height: 1.65;
+      text-wrap: pretty;
+    }
+
+    .accent {
+      color: var(--mint);
+    }
+
+    .risk {
+      color: var(--coral);
+    }
+
+    .amber {
+      color: var(--amber);
+    }
+
+    .struck {
+      color: var(--paper-muted);
+      text-decoration: line-through;
+      text-decoration-color: var(--coral);
+      text-decoration-thickness: clamp(0.08rem, 0.18vw, 0.16rem);
+    }
+
+    .case-id {
+      position: absolute;
+      top: clamp(1.2rem, 2.2vw, 2.2rem);
+      right: clamp(1.35rem, 2.8vw, 3rem);
+      color: var(--paper-muted);
+    }
+
+    .case-id strong {
+      color: var(--paper);
+    }
+
+    .quote-mark {
+      font-family: var(--serif);
+      font-size: clamp(4rem, 12vw, 10rem);
+      line-height: 0.7;
+      color: var(--mint);
+      opacity: 0.18;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: clamp(0.25rem, 0.45vw, 0.45rem) clamp(0.5rem, 0.9vw, 0.85rem);
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      color: var(--paper-muted);
+      background: rgba(7, 17, 15, 0.45);
+    }
+
+    .tag.mint {
+      border-color: rgba(77, 255, 195, 0.5);
+      color: var(--mint);
+    }
+
+    .tag.coral {
+      border-color: rgba(255, 105, 98, 0.55);
+      color: var(--coral);
+    }
+
+    .panel {
+      position: relative;
+      padding: clamp(0.9rem, 2vw, 1.8rem);
+      border: 1px solid var(--line);
+      background: rgba(11, 25, 21, 0.74);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .panel::before {
+      position: absolute;
+      top: -1px;
+      left: -1px;
+      width: clamp(2rem, 4vw, 4rem);
+      height: 2px;
+      background: var(--mint);
+      content: "";
+    }
+
+    .panel.risk-panel::before {
+      background: var(--coral);
+    }
+
+    .panel p {
+      color: var(--paper-muted);
+    }
+
+    .panel strong {
+      color: var(--paper);
+    }
+
+    .big-statement {
+      max-width: min(90vw, 1100px);
+      font-family: var(--serif);
+      font-size: clamp(1.45rem, 3.6vw, 3.4rem);
+      font-weight: 800;
+      line-height: 1.28;
+      text-wrap: balance;
+    }
+
+    .three-up {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: clamp(0.6rem, 1.4vw, 1.25rem);
+      width: 100%;
+    }
+
+    .two-up {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: clamp(0.75rem, 1.8vw, 1.6rem);
+      width: 100%;
+    }
+
+    .split-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+      align-items: center;
+      gap: clamp(1rem, 4vw, 4rem);
+      width: 100%;
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: clamp(0.6rem, 1.3vw, 1.2rem);
+    }
+
+    .problem-chain {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      align-items: stretch;
+      gap: clamp(0.4rem, 0.9vw, 0.8rem);
+    }
+
+    .problem-card {
+      position: relative;
+      min-height: clamp(8rem, 18vh, 11rem);
+      padding: clamp(0.75rem, 1.6vw, 1.4rem);
+      border-top: 1px solid var(--line-strong);
+      background: rgba(242, 237, 223, 0.035);
+    }
+
+    .problem-card:not(:last-child)::after {
+      position: absolute;
+      top: 50%;
+      right: clamp(-0.7rem, -0.8vw, -0.35rem);
+      z-index: 2;
+      color: var(--coral);
+      content: "→";
+      transform: translateY(-50%);
+    }
+
+    .problem-card .micro-label {
+      color: var(--coral);
+    }
+
+    .problem-card strong {
+      display: block;
+      margin-top: clamp(0.5rem, 1vh, 0.85rem);
+      font-size: clamp(0.9rem, 1.55vw, 1.25rem);
+    }
+
+    .problem-card p {
+      margin-top: clamp(0.35rem, 0.8vh, 0.65rem);
+      color: var(--paper-muted);
+      font-size: var(--small-size);
+    }
+
+    .definition {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
+      align-items: stretch;
+      gap: clamp(0.8rem, 2vw, 1.8rem);
+    }
+
+    .definition-main {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: clamp(12rem, 38vh, 22rem);
+      padding: clamp(1rem, 2.6vw, 2.5rem);
+      border: 1px solid rgba(77, 255, 195, 0.34);
+      background: linear-gradient(135deg, rgba(77, 255, 195, 0.11), rgba(77, 255, 195, 0.02));
+    }
+
+    .definition-main .big-statement {
+      max-width: min(90vw, 780px);
+    }
+
+    .definition-side {
+      display: grid;
+      grid-template-rows: repeat(3, 1fr);
+      gap: clamp(0.5rem, 1vw, 0.9rem);
+    }
+
+    .definition-side .panel {
+      display: flex;
+      align-items: center;
+      gap: clamp(0.6rem, 1vw, 0.9rem);
+    }
+
+    .definition-side .step-index {
+      color: var(--mint);
+    }
+
+    .not-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: clamp(0.45rem, 1vw, 0.9rem);
+    }
+
+    .not-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: clamp(9rem, 27vh, 16rem);
+      padding: clamp(0.7rem, 1.5vw, 1.35rem);
+      border: 1px solid var(--line);
+      background: rgba(11, 25, 21, 0.72);
+    }
+
+    .not-card .cross {
+      font-family: var(--serif);
+      font-size: clamp(2rem, 5vw, 4.5rem);
+      line-height: 1;
+      color: var(--coral);
+    }
+
+    .not-card strong {
+      font-size: clamp(0.83rem, 1.35vw, 1.1rem);
+      line-height: 1.45;
+    }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: clamp(0.35rem, 0.8vw, 0.7rem);
+      width: 100%;
+    }
+
+    .pipeline-step {
+      position: relative;
+      min-height: clamp(7.5rem, 22vh, 13rem);
+      padding: clamp(0.65rem, 1.3vw, 1.1rem);
+      border: 1px solid var(--line);
+      background: rgba(242, 237, 223, 0.035);
+    }
+
+    .pipeline-step::after {
+      position: absolute;
+      right: clamp(-0.62rem, -0.72vw, -0.3rem);
+      top: 50%;
+      z-index: 2;
+      color: var(--mint);
+      content: "›";
+      font-size: clamp(1.25rem, 2.8vw, 2.3rem);
+      transform: translateY(-50%);
+    }
+
+    .pipeline-step:last-child::after {
+      display: none;
+    }
+
+    .pipeline-step .step-index {
+      color: var(--mint);
+    }
+
+    .pipeline-step strong {
+      display: block;
+      margin-top: clamp(0.45rem, 0.9vh, 0.75rem);
+      font-size: clamp(0.82rem, 1.25vw, 1.05rem);
+    }
+
+    .pipeline-step p {
+      margin-top: clamp(0.3rem, 0.7vh, 0.55rem);
+      color: var(--paper-muted);
+      font-size: var(--small-size);
+      line-height: 1.45;
+    }
+
+    .gate-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: clamp(0.65rem, 1.5vw, 1.25rem);
+      padding: clamp(0.65rem, 1.2vw, 1rem) clamp(0.8rem, 1.6vw, 1.4rem);
+      border-left: clamp(0.2rem, 0.4vw, 0.35rem) solid var(--amber);
+      background: rgba(243, 204, 100, 0.08);
+    }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: center;
+      gap: clamp(0.75rem, 2vw, 1.75rem);
+    }
+
+    .comparison-side {
+      min-height: clamp(13rem, 43vh, 25rem);
+      padding: clamp(1rem, 2.4vw, 2.2rem);
+      border: 1px solid var(--line);
+      background: rgba(11, 25, 21, 0.76);
+    }
+
+    .comparison-side.good {
+      border-color: rgba(77, 255, 195, 0.32);
+      background: linear-gradient(145deg, rgba(77, 255, 195, 0.12), rgba(11, 25, 21, 0.76));
+    }
+
+    .comparison-arrow {
+      font-family: var(--serif);
+      font-size: clamp(2rem, 5vw, 5rem);
+      color: var(--mint);
+    }
+
+    .mini-list {
+      display: flex;
+      flex-direction: column;
+      gap: clamp(0.4rem, 0.9vh, 0.8rem);
+      margin: clamp(0.75rem, 1.8vh, 1.4rem) 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .mini-list li {
+      position: relative;
+      padding-left: clamp(1rem, 1.7vw, 1.4rem);
+      color: var(--paper-muted);
+      font-size: var(--body-size);
+    }
+
+    .mini-list li::before {
+      position: absolute;
+      left: 0;
+      color: var(--mint);
+      content: "＋";
+    }
+
+    .comparison-side:not(.good) .mini-list li::before {
+      color: var(--coral);
+      content: "−";
+    }
+
+    .deliverable-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      gap: clamp(0.8rem, 2vw, 1.8rem);
+    }
+
+    .decision-file {
+      padding: clamp(1rem, 2.4vw, 2.1rem);
+      border: 1px solid var(--line-strong);
+      background:
+        linear-gradient(90deg, rgba(77, 255, 195, 0.06), transparent 36%),
+        rgba(242, 237, 223, 0.045);
+    }
+
+    .decision-row {
+      display: grid;
+      grid-template-columns: clamp(4.5rem, 10vw, 8rem) minmax(0, 1fr);
+      gap: clamp(0.6rem, 1.4vw, 1.2rem);
+      padding-block: clamp(0.55rem, 1.1vh, 0.9rem);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .decision-row:last-child {
+      border-bottom: 0;
+    }
+
+    .decision-row .micro-label {
+      color: var(--mint);
+    }
+
+    .responsibility {
+      display: grid;
+      grid-template-rows: repeat(3, 1fr);
+      gap: clamp(0.5rem, 1vw, 0.9rem);
+    }
+
+    .responsibility .panel strong {
+      display: block;
+      margin-bottom: clamp(0.2rem, 0.5vh, 0.4rem);
+    }
+
+    .boundary-map {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: stretch;
+      gap: clamp(0.65rem, 1.6vw, 1.35rem);
+    }
+
+    .system-block {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: clamp(10rem, 31vh, 18rem);
+      padding: clamp(1rem, 2.5vw, 2.2rem);
+      border: 1px solid var(--line);
+      background: rgba(11, 25, 21, 0.78);
+    }
+
+    .system-block.kernel {
+      border-color: rgba(77, 255, 195, 0.38);
+      background: linear-gradient(145deg, rgba(77, 255, 195, 0.12), rgba(11, 25, 21, 0.78));
+    }
+
+    .system-block p {
+      color: var(--paper-muted);
+    }
+
+    .boundary-plus {
+      display: flex;
+      align-items: center;
+      font-family: var(--serif);
+      font-size: clamp(2rem, 5vw, 4rem);
+      color: var(--amber);
+    }
+
+    .difference-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin: clamp(0.7rem, 1.4vw, 1.2rem) 0 0;
+    }
+
+    .difference-list div {
+      display: grid;
+      grid-template-columns: clamp(4.5rem, 8vw, 6.5rem) minmax(0, 1fr);
+      gap: clamp(0.5rem, 1vw, 0.9rem);
+      padding-block: clamp(0.38rem, 0.8vh, 0.65rem);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .difference-list div:last-child {
+      border-bottom: 0;
+    }
+
+    .difference-list dt,
+    .difference-list dd {
+      margin: 0;
+    }
+
+    .difference-list dt {
+      color: var(--paper-muted);
+      font-family: var(--mono);
+      font-size: var(--small-size);
+    }
+
+    .difference-list dd {
+      color: var(--paper);
+      font-weight: 600;
+    }
+
+    .guarantee-chain .problem-card {
+      border-color: rgba(77, 255, 195, 0.22);
+      background: rgba(77, 255, 195, 0.045);
+    }
+
+    .guarantee-chain .problem-card .micro-label {
+      color: var(--mint);
+    }
+
+    .guarantee-chain .problem-card:not(:last-child)::after {
+      color: var(--mint);
+    }
+
+    .integration-ribbon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: clamp(0.45rem, 1vw, 0.85rem);
+    }
+
+    .integration-arrow {
+      color: var(--amber);
+      font-family: var(--serif);
+      font-size: clamp(1.1rem, 2.2vw, 1.8rem);
+    }
+
+    .failure-matrix {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) repeat(2, minmax(0, 1fr));
+      width: 100%;
+      border-top: 1px solid var(--line-strong);
+      border-left: 1px solid var(--line-strong);
+      background: rgba(11, 25, 21, 0.62);
+    }
+
+    .matrix-cell {
+      display: flex;
+      align-items: center;
+      min-height: clamp(2.8rem, 7.2vh, 4.4rem);
+      padding: clamp(0.45rem, 0.95vw, 0.8rem);
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      color: var(--paper-muted);
+      font-size: clamp(0.68rem, 1.15vw, 0.94rem);
+      line-height: 1.42;
+    }
+
+    .matrix-head {
+      min-height: 0;
+      color: var(--paper-muted);
+      background: rgba(242, 237, 223, 0.045);
+      font-family: var(--mono);
+      font-size: var(--small-size);
+      font-weight: 600;
+      letter-spacing: clamp(0.04em, 0.1vw, 0.09em);
+      text-transform: uppercase;
+    }
+
+    .matrix-situation {
+      color: var(--paper);
+      font-weight: 700;
+    }
+
+    .matrix-soft {
+      background: rgba(243, 204, 100, 0.035);
+    }
+
+    .matrix-hard {
+      color: var(--paper);
+      background: rgba(77, 255, 195, 0.055);
+    }
+
+    .matrix-soft::before,
+    .matrix-hard::before {
+      flex: 0 0 auto;
+      width: clamp(0.35rem, 0.55vw, 0.5rem);
+      height: clamp(0.35rem, 0.55vw, 0.5rem);
+      margin-right: clamp(0.4rem, 0.75vw, 0.65rem);
+      border-radius: 50%;
+      content: "";
+    }
+
+    .matrix-soft::before {
+      background: var(--amber);
+    }
+
+    .matrix-hard::before {
+      background: var(--mint);
+      box-shadow: 0 0 clamp(0.3rem, 0.7vw, 0.6rem) rgba(77, 255, 195, 0.42);
+    }
+
+    .closing {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 0;
+      gap: clamp(0.65rem, 1.5vw, 1.3rem);
+    }
+
+    .closing h2 {
+      max-width: min(92vw, 1180px);
+      font-size: clamp(1.8rem, 5vw, 4.5rem);
+    }
+
+    .closing-line {
+      width: min(86vw, 960px);
+      height: 1px;
+      background: linear-gradient(90deg, var(--mint), transparent);
+    }
+
+    .use-cases {
+      display: flex;
+      flex-wrap: wrap;
+      gap: clamp(0.45rem, 1vw, 0.85rem);
+    }
+
+    /* ---------- Presentation chrome ---------- */
+    .progress {
+      position: fixed;
+      z-index: 40;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: clamp(0.15rem, 0.3vw, 0.25rem);
+      background: var(--mint);
+      box-shadow: 0 0 clamp(0.5rem, 1vw, 1rem) rgba(77, 255, 195, 0.65);
+      transition: width 280ms ease;
+    }
+
+    .nav-dots {
+      position: fixed;
+      z-index: 40;
+      top: 50%;
+      right: clamp(0.45rem, 1.1vw, 1rem);
+      display: flex;
+      flex-direction: column;
+      gap: clamp(0.35rem, 0.7vw, 0.6rem);
+      transform: translateY(-50%);
+    }
+
+    .nav-dot {
+      width: clamp(0.42rem, 0.65vw, 0.62rem);
+      height: clamp(0.42rem, 0.65vw, 0.62rem);
+      padding: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: 50%;
+      background: transparent;
+      cursor: pointer;
+      transition: background 180ms ease, transform 180ms ease;
+    }
+
+    .nav-dot[aria-current="true"] {
+      background: var(--mint);
+      border-color: var(--mint);
+      transform: scale(1.35);
+    }
+
+    .keyboard-hint {
+      position: fixed;
+      z-index: 35;
+      left: clamp(1.15rem, 2.4vw, 2.5rem);
+      bottom: clamp(0.75rem, 1.5vw, 1.35rem);
+      color: rgba(168, 184, 177, 0.7);
+      font-family: var(--mono);
+      font-size: var(--small-size);
+    }
+
+    .edit-hotzone {
+      position: fixed;
+      z-index: 60;
+      top: 0;
+      left: 0;
+      width: clamp(3.25rem, 6vw, 5.25rem);
+      height: clamp(3.25rem, 6vw, 5.25rem);
+    }
+
+    .edit-toggle {
+      position: fixed;
+      z-index: 61;
+      top: clamp(0.65rem, 1vw, 1rem);
+      left: clamp(0.65rem, 1vw, 1rem);
+      padding: clamp(0.35rem, 0.6vw, 0.55rem) clamp(0.55rem, 0.9vw, 0.85rem);
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      color: var(--paper-muted);
+      background: rgba(7, 17, 15, 0.88);
+      font-family: var(--mono);
+      font-size: var(--small-size);
+      opacity: 0;
+      pointer-events: none;
+      cursor: pointer;
+      transition: opacity 180ms ease, color 180ms ease, border-color 180ms ease;
+    }
+
+    .edit-hotzone:hover + .edit-toggle,
+    .edit-toggle:hover,
+    .edit-toggle:focus-visible,
+    .edit-toggle.is-visible,
+    .edit-active .edit-toggle {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .edit-active .edit-toggle {
+      color: var(--mint);
+      border-color: rgba(77, 255, 195, 0.55);
+    }
+
+    .edit-banner {
+      position: fixed;
+      z-index: 58;
+      top: clamp(0.7rem, 1.3vw, 1.25rem);
+      left: 50%;
+      display: none;
+      padding: clamp(0.35rem, 0.65vw, 0.55rem) clamp(0.65rem, 1vw, 1rem);
+      border: 1px solid rgba(77, 255, 195, 0.4);
+      border-radius: 999px;
+      color: var(--mint);
+      background: rgba(7, 17, 15, 0.92);
+      font-family: var(--mono);
+      font-size: var(--small-size);
+      transform: translateX(-50%);
+    }
+
+    .edit-active .edit-banner {
+      display: block;
+    }
+
+    .edit-active [data-editable] {
+      outline: 1px dashed rgba(77, 255, 195, 0.48);
+      outline-offset: clamp(0.15rem, 0.25vw, 0.25rem);
+      cursor: text;
+    }
+
+    [data-editable]:focus {
+      outline: 2px solid var(--mint);
+    }
+
+    /* ---------- Entrance motion ---------- */
+    .reveal {
+      opacity: 0;
+      transform: translateY(clamp(0.8rem, 1.8vw, 1.5rem));
+      transition: opacity 560ms ease, transform 560ms ease;
+    }
+
+    .slide.is-visible .reveal {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .slide.is-visible .reveal:nth-child(2) {
+      transition-delay: 90ms;
+    }
+
+    .slide.is-visible .reveal:nth-child(3) {
+      transition-delay: 170ms;
+    }
+
+    .slide.is-visible .reveal:nth-child(4) {
+      transition-delay: 250ms;
+    }
+
+    /* ---------- Responsive adjustments ---------- */
+    @media (max-width: 900px) {
+      .three-up,
+      .problem-chain {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .not-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .pipeline {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .split-hero,
+      .definition,
+      .deliverable-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .split-hero .panel,
+      .definition-side,
+      .responsibility {
+        display: none;
+      }
+
+      .not-card:nth-child(n+4) {
+        display: none;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .two-up,
+      .three-up,
+      .comparison,
+      .boundary-map {
+        grid-template-columns: 1fr;
+      }
+
+      .problem-chain {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .problem-card {
+        min-height: clamp(5.5rem, 14vh, 7rem);
+      }
+
+      .problem-card::after,
+      .comparison-arrow,
+      .boundary-plus,
+      .comparison-side:first-child {
+        display: none;
+      }
+
+      .pipeline {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .pipeline-step {
+        min-height: clamp(5.2rem, 14vh, 7rem);
+      }
+
+      .not-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .not-card {
+        min-height: clamp(6rem, 16vh, 8rem);
+      }
+
+      .not-card:nth-child(3) {
+        display: none;
+      }
+
+      .comparison-side {
+        min-height: clamp(12rem, 48vh, 20rem);
+      }
+
+      .system-block {
+        min-height: clamp(8rem, 22vh, 12rem);
+      }
+
+      .decision-row {
+        grid-template-columns: clamp(4rem, 22vw, 5rem) minmax(0, 1fr);
+      }
+
+      .failure-matrix {
+        grid-template-columns: minmax(0, 0.88fr) repeat(2, minmax(0, 1fr));
+      }
+
+      .matrix-cell {
+        padding: clamp(0.3rem, 1.5vw, 0.48rem);
+        font-size: clamp(0.61rem, 2.7vw, 0.76rem);
+      }
+
+      .case-id {
+        display: none;
+      }
+    }
+
+    @media (max-height: 600px) {
+      .problem-card,
+      .pipeline-step,
+      .not-card {
+        min-height: 0;
+      }
+
+      .definition-main,
+      .comparison-side {
+        min-height: clamp(9rem, 43vh, 15rem);
+      }
+
+      .system-block {
+        min-height: clamp(7rem, 25vh, 9rem);
+      }
+
+      .quote-mark {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress" aria-hidden="true"></div>
+  <nav class="nav-dots" aria-label="幻灯片导航"></nav>
+  <div class="keyboard-hint" aria-hidden="true">← → 翻页 · E 编辑</div>
+  <div class="edit-hotzone" aria-hidden="true"></div>
+  <button class="edit-toggle" type="button" aria-pressed="false" aria-label="切换编辑模式">E · EDIT</button>
+  <div class="edit-banner" role="status">编辑模式 · 自动保存 · Ctrl/⌘ + S 导出</div>
+
+  <main>
+    <!-- 01 · Opening -->
+    <section class="slide" id="slide-1" aria-labelledby="slide-1-title">
+      <div class="case-id">CASE <strong>新人 × AI</strong></div>
+      <div class="slide-content">
+        <div class="eyebrow reveal">Decision support infrastructure</div>
+        <div class="split-hero">
+          <div class="stack reveal">
+            <h1 id="slide-1-title" data-editable data-edit-id="s1-title">Agent Debate Engine</h1>
+            <p class="big-statement" data-editable data-edit-id="s1-statement">
+              当新人还无法判断 AI 时，<span class="accent">不让 AI 独自当裁判。</span>
+            </p>
+            <p class="lead" data-editable data-edit-id="s1-lead">
+              用多模型对抗、确定性收敛与可审计证据，帮助经验不足的同事审查技术方案。
+            </p>
+          </div>
+          <aside class="panel reveal">
+            <div class="quote-mark">“</div>
+            <p data-editable data-edit-id="s1-aside">
+              目标不是得到更多回答，<br>
+              而是让一个回答<strong>经得起反驳</strong>。
+            </p>
+          </aside>
+        </div>
+      </div>
+      <div class="slide-number">01 / 08</div>
+    </section>
+
+    <!-- 02 · Origin -->
+    <section class="slide" id="slide-2" aria-labelledby="slide-2-title">
+      <div class="case-id">ORIGIN <strong>为什么做</strong></div>
+      <div class="slide-content">
+        <div class="eyebrow reveal">The original observation</div>
+        <h2 id="slide-2-title" class="reveal" data-editable data-edit-id="s2-title">
+          AI 回答得很快，<br>但新人的判断力还没来得及建立。
+        </h2>
+        <div class="three-up reveal">
+          <article class="panel risk-panel">
+            <span class="micro-label risk">01 · Knowledge gap</span>
+            <h3 data-editable data-edit-id="s2-c1-title">缺少前置知识</h3>
+            <p data-editable data-edit-id="s2-c1-body">不知道哪些约束、失败模式和工程常识必须先问。</p>
+          </article>
+          <article class="panel risk-panel">
+            <span class="micro-label risk">02 · Experience gap</span>
+            <h3 data-editable data-edit-id="s2-c2-title">缺少踩坑经验</h3>
+            <p data-editable data-edit-id="s2-c2-body">看不出“听起来合理”与“实际可落地”之间的距离。</p>
+          </article>
+          <article class="panel risk-panel">
+            <span class="micro-label risk">03 · Confidence trap</span>
+            <h3 data-editable data-edit-id="s2-c3-title">被流畅表达说服</h3>
+            <p data-editable data-edit-id="s2-c3-body">无法判断正确与否，于是把 AI 的自信当成证据。</p>
+          </article>
+        </div>
+        <p class="big-statement reveal" data-editable data-edit-id="s2-conclusion">
+          问题不是 AI 不会回答，<span class="risk">而是新人还不会判断。</span>
+        </p>
+      </div>
+      <div class="slide-number">02 / 08</div>
+    </section>
+
+    <!-- 03 · Failure chain -->
+    <section class="slide" id="slide-3" aria-labelledby="slide-3-title">
+      <div class="case-id">RISK <strong>单模型锚定</strong></div>
+      <div class="slide-content">
+        <div class="eyebrow reveal">The failure chain</div>
+        <h2 id="slide-3-title" class="reveal" data-editable data-edit-id="s3-title">
+          一次顺滑的对话，可能把不确定性藏起来。
+        </h2>
+        <div class="problem-chain reveal">
+          <article class="problem-card">
+            <span class="micro-label">Step 01</span>
+            <strong data-editable data-edit-id="s3-p1-title">问题不完整</strong>
+            <p data-editable data-edit-id="s3-p1-body">遗漏关键约束与风险。</p>
+          </article>
+          <article class="problem-card">
+            <span class="micro-label">Step 02</span>
+            <strong data-editable data-edit-id="s3-p2-title">AI 补全假设</strong>
+            <p data-editable data-edit-id="s3-p2-body">默认了一组未被验证的前提。</p>
+          </article>
+          <article class="problem-card">
+            <span class="micro-label">Step 03</span>
+            <strong data-editable data-edit-id="s3-p3-title">新人接受叙事</strong>
+            <p data-editable data-edit-id="s3-p3-body">缺少反例，无法形成对照。</p>
+          </article>
+          <article class="problem-card">
+            <span class="micro-label">Step 04</span>
+            <strong data-editable data-edit-id="s3-p4-title">问题延迟暴露</strong>
+            <p data-editable data-edit-id="s3-p4-body">到评审、上线或事故时才发现。</p>
+          </article>
+        </div>
+        <div class="gate-line reveal">
+          <strong data-editable data-edit-id="s3-gate-title">需要的不是“再问一次”</strong>
+          <span data-editable data-edit-id="s3-gate-body">而是一套强制产生反方、修订与未决问题的流程。</span>
+        </div>
+      </div>
+      <div class="slide-number">03 / 08</div>
+    </section>
+
+    <!-- 04 · Definition -->
+    <section class="slide" id="slide-4" aria-labelledby="slide-4-title">
+      <div class="case-id">DEFINITION <strong>它是什么</strong></div>
+      <div class="slide-content">
+        <div class="eyebrow reveal">What it is</div>
+        <h2 id="slide-4-title" class="reveal" data-editable data-edit-id="s4-title">
+          一套结构化、有限制、可追溯的技术决策协议。
+        </h2>
+        <div class="definition reveal">
+          <article class="definition-main">
+            <span class="tag mint">不是另一个模型，而是约束模型的流程</span>
+            <p class="big-statement" data-editable data-edit-id="s4-definition">
+              让多个模型<strong class="accent">独立提出方案</strong>、相互攻击、修订结论，最后由系统规则决定是否真正收敛。
+            </p>
+          </article>
+          <div class="definition-side">
+            <article class="panel">
+              <span class="step-index">A</span>
+              <strong data-editable data-edit-id="s4-a">多模型产生独立候选</strong>
+            </article>
+            <article class="panel">
+              <span class="step-index">B</span>
+              <strong data-editable data-edit-id="s4-b">强制批评、审查与修订</strong>
+            </article>
+            <article class="panel">
+              <span class="step-index">C</span>
+              <strong data-editable data-edit-id="s4-c">确定性停止并保存证据</strong>
+            </article>
+          </div>
+        </div>
+      </div>
+      <div class="slide-number">04 / 08</div>
+    </section>
+
+    <!-- 05 · Anti-definition -->
+    <section class="slide" id="slide-5" aria-labelledby="slide-5-title">
+      <div class="case-id">BOUNDARY <strong>它不是什么</strong></div>
+      <div class="slide-content">
+        <div class="eyebrow reveal">What it is not</div>
+        <h2 id="slide-5-title" class="reveal" data-editable data-edit-id="s5-title">
+          它提升判断质量，<span class="risk">但不制造绝对正确。</span>
+        </h2>
+        <div class="not-grid reveal">
+          <article class="not-card">
+            <span class="cross">×</span>
+            <strong data-editable data-edit-id="s5-n1">不是真理机器</strong>
+          </article>
+          <article class="not-card">
+            <span class="cross">×</span>
+            <strong data-editable data-edit-id="s5-n2">不替代资深同事<br>与最终责任人</strong>
+          </article>
+          <article class="not-card">
+            <span class="cross">×</span>
+            <strong data-editable data-edit-id="s5-n3">不是“多数模型<br>同意就算正确”</strong>
+          </article>
+          <article class="not-card">
+            <span class="cross">×</span>
+            <strong data-editable data-edit-id="s5-n4">不是通用 Agent<br>调度平台</strong>
+          </article>
+          <article class="not-card">
+            <span class="cross">×</span>
+            <strong data-editable data-edit-id="s5-n5">不是让多个 Agent<br>自由修改代码</strong>
+          </article>
+        </div>
+        <p class="lead reveal" data-editable data-edit-id="s5-foot">
+          它把“AI 说得像真的”转化为“方案是否满足明确、可检查的收敛条件”。
+        </p>
+      </div>
+      <div class="slide-number">05 / 08</div>
+    </section>
+
+    <!-- 06 · Mechanics -->
+    <section class="slide" id="slide-6" aria-labelledby="slide-6-title">
+      <div class="case-id">PROTOCOL <strong>如何工作</strong></div>
+      <div class="slide-content">
+        <div class="eyebrow reveal">A bounded debate</div>
+        <h2 id="slide-6-title" class="reveal" data-editable data-edit-id="s6-title">
+          模型负责提出判断，系统负责约束判断。
+        </h2>
+        <div class="pipeline reveal">
+          <article class="pipeline-step">
+            <span class="step-index">01</span>
+            <strong data-editable data-edit-id="s6-p1-title">校验输入</strong>
+            <p data-editable data-edit-id="s6-p1-body">先确认问题与配置合法。</p>
+          </article>
+          <article class="pipeline-step">
+            <span class="step-index">02 · ∥</span>
+            <strong data-editable data-edit-id="s6-p2-title">独立提案</strong>
+            <p data-editable data-edit-id="s6-p2-body">多个参与者并行作答。</p>
+          </article>
+          <article class="pipeline-step">
+            <span class="step-index">03</span>
+            <strong data-editable data-edit-id="s6-p3-title">批评攻击</strong>
+            <p data-editable data-edit-id="s6-p3-body">寻找漏洞、假设与反例。</p>
+          </article>
+          <article class="pipeline-step">
+            <span class="step-index">04</span>
+            <strong data-editable data-edit-id="s6-p4-title">审查修订</strong>
+            <p data-editable data-edit-id="s6-p4-body">回应批评，明确取舍。</p>
+          </article>
+          <article class="pipeline-step">
+            <span class="step-index">05</span>
+            <strong data-editable data-edit-id="s6-p5-title">严格裁判</strong>
+            <p data-editable data-edit-id="s6-p5-body">只接受符合 Schema 的结论。</p>
+          </article>
+          <article class="pipeline-step">
+            <span class="step-index">06</span>
+            <strong data-editable data-edit-id="s6-p6-title">确定性停止</strong>
+            <p data-editable data-edit-id="s6-p6-body">规则判定收敛或耗尽。</p>
+          </article>
+        </div>
+        <div class="gate-line reveal">
+          <strong class="amber" data-editable data-edit-id="s6-gate-title">同意 ≠ 收敛</strong>
+          <span data-editable data-edit-id="s6-gate-body">轮次、置信度、关键问题、稳定性都必须过门槛；最终状态由代码决定。</span>
+        </div>
+      </div>
+      <div class="slide-number">06 / 08</div>
+    </section>
+
+    <!-- 07 · The decisive trust boundary -->
+    <section class="slide" id="slide-7" aria-labelledby="slide-7-title">
+      <div class="case-id">TRUST <strong>真正的分界线</strong></div>
+      <div class="slide-content">
+        <div class="eyebrow reveal">Execution truth ≠ decision truth</div>
+        <h2 id="slide-7-title" class="reveal" data-editable data-edit-id="s7-title">
+          真正的区别：谁有权宣布“这个结论可以相信”？
+        </h2>
+        <div class="boundary-map reveal">
+          <article class="system-block">
+            <div>
+              <span class="tag">Multica · main 9e3b661</span>
+              <h3 data-editable data-edit-id="s7-m-title">系统保证任务被可靠执行</h3>
+              <dl class="difference-list">
+                <div>
+                  <dt>硬保证</dt>
+                  <dd data-editable data-edit-id="s7-m-object">状态、超时、重试、阶段屏障</dd>
+                </div>
+                <div>
+                  <dt>决策含义</dt>
+                  <dd data-editable data-edit-id="s7-m-good">由 Leader、Agent 或人解释</dd>
+                </div>
+                <div>
+                  <dt>证明的是</dt>
+                  <dd data-editable data-edit-id="s7-m-done">“工作跑过了”</dd>
+                </div>
+              </dl>
+            </div>
+            <span class="micro-label">Execution authority</span>
+          </article>
+          <div class="boundary-plus" aria-hidden="true">≠</div>
+          <article class="system-block kernel">
+            <div>
+              <span class="tag mint">Agent Debate Engine</span>
+              <h3 data-editable data-edit-id="s7-a-title">系统保证评审协议不能被跳过</h3>
+              <dl class="difference-list">
+                <div>
+                  <dt>信任模型</dt>
+                  <dd data-editable data-edit-id="s7-a-object">所有模型输出都是不可信输入</dd>
+                </div>
+                <div>
+                  <dt>最终权力</dt>
+                  <dd data-editable data-edit-id="s7-a-good">严格解析器与确定性代码</dd>
+                </div>
+                <div>
+                  <dt>证明的是</dt>
+                  <dd data-editable data-edit-id="s7-a-done">“明确的评审门槛通过了”</dd>
+                </div>
+              </dl>
+            </div>
+            <span class="micro-label accent">Protocol authority</span>
+          </article>
+        </div>
+        <div class="gate-line reveal">
+          <strong class="amber" data-editable data-edit-id="s7-gate-title">新人最缺的，正是发现“评审被跳过”的能力。</strong>
+          <span data-editable data-edit-id="s7-gate-body">所以守门职责不能再交给一个会被流畅语言说服的 AI。</span>
+        </div>
+      </div>
+      <div class="slide-number">07 / 08</div>
+    </section>
+
+    <!-- 08 · Failure-path proof -->
+    <section class="slide" id="slide-8" aria-labelledby="slide-8-title">
+      <div class="case-id">PROOF <strong>失败路径才见真章</strong></div>
+      <div class="slide-content">
+        <div class="eyebrow reveal">Same agents, different outcome</div>
+        <h2 id="slide-8-title" class="reveal" data-editable data-edit-id="s8-title">
+          同样的多 Agent 流程，失败时会得到完全不同的结论。
+        </h2>
+        <div class="failure-matrix reveal" role="table" aria-label="Multica 调度流程与 Agent Debate Engine 的失败路径对比">
+          <div class="matrix-cell matrix-head" role="columnheader">发生什么</div>
+          <div class="matrix-cell matrix-head" role="columnheader">仅用 Multica 编排</div>
+          <div class="matrix-cell matrix-head accent" role="columnheader">Debate Engine</div>
+
+          <div class="matrix-cell matrix-situation" role="cell" data-editable data-edit-id="s8-case1">全员同意，但仍有关键风险</div>
+          <div class="matrix-cell matrix-soft" role="cell" data-editable data-edit-id="s8-m1">工作流仍可被推进</div>
+          <div class="matrix-cell matrix-hard" role="cell" data-editable data-edit-id="s8-a1">拒绝 finalized</div>
+
+          <div class="matrix-cell matrix-situation" role="cell" data-editable data-edit-id="s8-case2">Judge 输出漂亮文字或坏 JSON</div>
+          <div class="matrix-cell matrix-soft" role="cell" data-editable data-edit-id="s8-m2">任务已有成功输出</div>
+          <div class="matrix-cell matrix-hard" role="cell" data-editable data-edit-id="s8-a2">有限修复，否则协议失败</div>
+
+          <div class="matrix-cell matrix-situation" role="cell" data-editable data-edit-id="s8-case3">最后一轮仍要求继续</div>
+          <div class="matrix-cell matrix-soft" role="cell" data-editable data-edit-id="s8-m3">所有任务都已完成</div>
+          <div class="matrix-cell matrix-hard" role="cell" data-editable data-edit-id="s8-a3">exhausted，不冒充共识</div>
+
+          <div class="matrix-cell matrix-situation" role="cell" data-editable data-edit-id="s8-case4">恢复前，历史证据被改动</div>
+          <div class="matrix-cell matrix-soft" role="cell" data-editable data-edit-id="s8-m4">可复用会话与工作目录</div>
+          <div class="matrix-cell matrix-hard" role="cell" data-editable data-edit-id="s8-a4">哈希不一致，拒绝恢复</div>
+        </div>
+        <div class="gate-line reveal">
+          <strong data-editable data-edit-id="s8-gate-title">第二套 Agent 调度平台没有必要。</strong>
+          <span class="accent" data-editable data-edit-id="s8-gate-body">若 Multica-only 同样阻断这四类错误，就删掉项目；否则这段内核有必要。</span>
+        </div>
+      </div>
+      <div class="slide-number">08 / 08</div>
+    </section>
+  </main>
+
+  <script>
+    /* ---------- Slide controller ---------- */
+    class SlidePresentation {
+      constructor() {
+        this.slides = Array.from(document.querySelectorAll(".slide"));
+        this.progress = document.querySelector(".progress");
+        this.nav = document.querySelector(".nav-dots");
+        this.currentIndex = 0;
+        this.touchStartY = 0;
+        this.wheelLocked = false;
+        this.isEditing = false;
+        this.storageKey = "agent-debate-engine-onboarding-v3";
+
+        this.buildNavigation();
+        this.bindEvents();
+        this.restoreEdits();
+        this.observeSlides();
+        this.updateChrome(0);
+      }
+
+      buildNavigation() {
+        this.slides.forEach((slide, index) => {
+          const dot = document.createElement("button");
+          dot.className = "nav-dot";
+          dot.type = "button";
+          dot.setAttribute("aria-label", `跳转到第 ${index + 1} 页`);
+          dot.addEventListener("click", () => this.goTo(index));
+          this.nav.appendChild(dot);
+        });
+        this.dots = Array.from(this.nav.querySelectorAll(".nav-dot"));
+      }
+
+      bindEvents() {
+        window.addEventListener("keydown", (event) => this.onKeyDown(event));
+        window.addEventListener("wheel", (event) => this.onWheel(event), { passive: false });
+        window.addEventListener("touchstart", (event) => {
+          this.touchStartY = event.changedTouches[0].clientY;
+        }, { passive: true });
+        window.addEventListener("touchend", (event) => {
+          const delta = this.touchStartY - event.changedTouches[0].clientY;
+          if (Math.abs(delta) > 50 && !this.isEditing) {
+            delta > 0 ? this.next() : this.previous();
+          }
+        }, { passive: true });
+
+        const toggle = document.querySelector(".edit-toggle");
+        const hotzone = document.querySelector(".edit-hotzone");
+        let hideTimer;
+
+        hotzone.addEventListener("mouseenter", () => {
+          clearTimeout(hideTimer);
+          toggle.classList.add("is-visible");
+        });
+        hotzone.addEventListener("mouseleave", () => {
+          hideTimer = window.setTimeout(() => toggle.classList.remove("is-visible"), 400);
+        });
+        toggle.addEventListener("mouseenter", () => clearTimeout(hideTimer));
+        toggle.addEventListener("mouseleave", () => {
+          hideTimer = window.setTimeout(() => toggle.classList.remove("is-visible"), 400);
+        });
+        toggle.addEventListener("click", () => this.toggleEditMode());
+
+        document.querySelectorAll("[data-editable]").forEach((element) => {
+          element.addEventListener("input", () => this.saveEdits());
+        });
+      }
+
+      onKeyDown(event) {
+        const targetIsEditable = event.target.isContentEditable ||
+          ["INPUT", "TEXTAREA"].includes(event.target.tagName);
+
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s" && this.isEditing) {
+          event.preventDefault();
+          this.exportFile();
+          return;
+        }
+
+        if (event.key.toLowerCase() === "e" && !targetIsEditable) {
+          event.preventDefault();
+          this.toggleEditMode();
+          return;
+        }
+
+        if (targetIsEditable || this.isEditing) return;
+
+        if (["ArrowRight", "ArrowDown", "PageDown", " "].includes(event.key)) {
+          event.preventDefault();
+          this.next();
+        } else if (["ArrowLeft", "ArrowUp", "PageUp"].includes(event.key)) {
+          event.preventDefault();
+          this.previous();
+        } else if (event.key === "Home") {
+          event.preventDefault();
+          this.goTo(0);
+        } else if (event.key === "End") {
+          event.preventDefault();
+          this.goTo(this.slides.length - 1);
+        }
+      }
+
+      onWheel(event) {
+        if (this.isEditing || this.wheelLocked || Math.abs(event.deltaY) < 20) return;
+        event.preventDefault();
+        this.wheelLocked = true;
+        event.deltaY > 0 ? this.next() : this.previous();
+        window.setTimeout(() => {
+          this.wheelLocked = false;
+        }, 650);
+      }
+
+      observeSlides() {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting && entry.intersectionRatio >= 0.55) {
+              const index = this.slides.indexOf(entry.target);
+              this.currentIndex = index;
+              entry.target.classList.add("is-visible");
+              this.updateChrome(index);
+            }
+          });
+        }, { threshold: [0.55] });
+
+        this.slides.forEach((slide) => observer.observe(slide));
+      }
+
+      goTo(index) {
+        const bounded = Math.max(0, Math.min(index, this.slides.length - 1));
+        this.currentIndex = bounded;
+        this.slides[bounded].scrollIntoView({ behavior: "smooth", block: "start" });
+        this.updateChrome(bounded);
+      }
+
+      next() {
+        this.goTo(this.currentIndex + 1);
+      }
+
+      previous() {
+        this.goTo(this.currentIndex - 1);
+      }
+
+      updateChrome(index) {
+        const completed = ((index + 1) / this.slides.length) * 100;
+        this.progress.style.width = `${completed}%`;
+        this.dots.forEach((dot, dotIndex) => {
+          dot.setAttribute("aria-current", dotIndex === index ? "true" : "false");
+        });
+      }
+
+      toggleEditMode() {
+        this.isEditing = !this.isEditing;
+        document.body.classList.toggle("edit-active", this.isEditing);
+        const toggle = document.querySelector(".edit-toggle");
+        toggle.setAttribute("aria-pressed", String(this.isEditing));
+        toggle.textContent = this.isEditing ? "E · DONE" : "E · EDIT";
+        document.querySelectorAll("[data-editable]").forEach((element) => {
+          element.contentEditable = String(this.isEditing);
+          element.spellcheck = this.isEditing;
+        });
+      }
+
+      saveEdits() {
+        const edits = {};
+        document.querySelectorAll("[data-editable]").forEach((element) => {
+          edits[element.dataset.editId] = element.innerHTML;
+        });
+        localStorage.setItem(this.storageKey, JSON.stringify(edits));
+      }
+
+      restoreEdits() {
+        try {
+          const edits = JSON.parse(localStorage.getItem(this.storageKey) || "{}");
+          document.querySelectorAll("[data-editable]").forEach((element) => {
+            if (Object.prototype.hasOwnProperty.call(edits, element.dataset.editId)) {
+              element.innerHTML = edits[element.dataset.editId];
+            }
+          });
+        } catch (error) {
+          console.warn("无法恢复本地编辑内容。", error);
+        }
+      }
+
+      exportFile() {
+        this.saveEdits();
+        const wasEditing = this.isEditing;
+        const toggle = document.querySelector(".edit-toggle");
+        const banner = document.querySelector(".edit-banner");
+        const hotzone = document.querySelector(".edit-hotzone");
+
+        document.body.classList.remove("edit-active");
+        toggle.classList.remove("is-visible");
+        toggle.setAttribute("aria-pressed", "false");
+        toggle.textContent = "E · EDIT";
+        banner.style.display = "none";
+        hotzone.style.display = "none";
+        document.querySelectorAll("[data-editable]").forEach((element) => {
+          element.removeAttribute("contenteditable");
+          element.removeAttribute("spellcheck");
+        });
+
+        const html = "<!doctype html>\n" + document.documentElement.outerHTML;
+
+        if (wasEditing) {
+          document.body.classList.add("edit-active");
+          toggle.setAttribute("aria-pressed", "true");
+          toggle.textContent = "E · DONE";
+          banner.style.removeProperty("display");
+          hotzone.style.removeProperty("display");
+          document.querySelectorAll("[data-editable]").forEach((element) => {
+            element.contentEditable = "true";
+            element.spellcheck = true;
+          });
+        }
+
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "agent-debate-engine-onboarding.html";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      window.presentation = new SlidePresentation();
+    });
+  </script>
+</body>
+</html>
