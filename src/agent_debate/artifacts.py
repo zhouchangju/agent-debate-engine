@@ -937,9 +937,7 @@ class ArtifactStore:
         """Persist the complete reader-facing evidence transcript."""
 
         evidence_text = _as_text(text)
-        records = self._write_artifact_batch(
-            {Path("evidence.md"): evidence_text.encode("utf-8")}
-        )
+        records = self._write_artifact_batch({Path("evidence.md"): evidence_text.encode("utf-8")})
 
         def mutate(manifest: dict[str, Any]) -> None:
             _artifacts_dict(manifest).update(records)
@@ -952,9 +950,7 @@ class ArtifactStore:
     def write_result(self, document: Mapping[str, object]) -> dict[str, Any]:
         """Persist the canonical machine-readable result document."""
 
-        records = self._write_artifact_batch(
-            {Path("result.json"): _json_bytes(document)}
-        )
+        records = self._write_artifact_batch({Path("result.json"): _json_bytes(document)})
 
         def mutate(manifest: dict[str, Any]) -> None:
             _artifacts_dict(manifest).update(records)

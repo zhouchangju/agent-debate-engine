@@ -236,14 +236,12 @@ def render_evidence_report(
                 f"### {index}. {role} via {agent}",
                 "",
                 f"- Invocation: `{item.get('invocation_id', 'unknown')}`",
-                f"- Round/stage: `{item.get('round_number', '?')}` / "
-                f"`{item.get('stage', '?')}`",
+                f"- Round/stage: `{item.get('round_number', '?')}` / `{item.get('stage', '?')}`",
                 f"- Adapter/model: `{meta.get('provider_adapter', 'unknown')}` / "
                 f"`{meta.get('provider_model') or 'provider default'}`",
                 f"- Status: `{meta.get('status', item.get('status', 'unknown'))}`",
                 f"- Session mode: `{meta.get('session_mode', 'unverified')}`",
-                f"- Session enforcement: "
-                f"{meta.get('session_enforcement', 'not declared')}",
+                f"- Session enforcement: {meta.get('session_enforcement', 'not declared')}",
                 "",
                 "#### Exact input",
                 "",

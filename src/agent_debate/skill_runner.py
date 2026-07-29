@@ -12,10 +12,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NoReturn
 
+from agent_debate.dashboard_launcher import open_run_dashboard
 from agent_debate.engine import EngineResult, resume_debate, run_debate
 from agent_debate.errors import ConfigError, DebateError
 from agent_debate.presets import DebateDepth, build_technical_review_config
-from agent_debate.dashboard_launcher import open_run_dashboard
 
 _EXIT_ERROR = 1
 _EXIT_USAGE = 2
