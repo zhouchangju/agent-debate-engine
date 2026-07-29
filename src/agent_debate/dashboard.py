@@ -5,8 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import threading
 import webbrowser
+from collections.abc import Callable
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -31,7 +33,7 @@ def _contained(root: Path, candidate: Path) -> bool:
 def _read_json(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
-        raise ValueError(f"{path.name} is not a JSON object")
+        raise TypeError(f"{path.name} is not a JSON object")
     return value
 
 
@@ -62,7 +64,7 @@ class DashboardRepository:
                     continue
                 try:
                     manifest = _read_json(manifest_path)
-                except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+                except (OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError):
                     continue
                 run_id = manifest.get("run_id")
                 if not isinstance(run_id, str) or _RUN_ID_RE.fullmatch(run_id) is None:
@@ -81,7 +83,7 @@ class DashboardRepository:
         )
 
     @staticmethod
-    def _artifact_reader(entry: RunEntry):
+    def _artifact_reader(entry: RunEntry) -> Callable[[str], str]:
         run_root = entry.run_dir.resolve()
 
         def read(relative: str) -> str:
@@ -110,7 +112,7 @@ class DashboardRepository:
         for entry in self._entries():
             try:
                 document = self._document(entry)
-            except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+            except (OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError):
                 continue
             run = document.get("run")
             summary = document.get("summary")
@@ -162,11 +164,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 DASHBOARD_HTML.encode("utf-8"),
                 "text/html; charset=utf-8",
             )
-            return
-        if parsed.path == "/api/runs":
+        elif parsed.path == "/api/runs":
             self._send_json({"schema_version": 1, "runs": self.repository.list_runs()})
-            return
-        if parsed.path == "/api/health":
+        elif parsed.path == "/api/health":
             self._send_json(
                 {
                     "ok": True,
@@ -174,26 +174,24 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     "roots": [str(root) for root in self.repository.roots],
                 }
             )
-            return
-        if parsed.path.startswith("/api/runs/"):
+        elif parsed.path.startswith("/api/runs/"):
             key = unquote(parsed.path.removeprefix("/api/runs/"))
             if _RUN_ID_RE.fullmatch(key) is None:
                 self._send_json({"error": "invalid run id"}, HTTPStatus.BAD_REQUEST)
-                return
-            document = self.repository.get_run(key)
-            if document is None:
-                self._send_json({"error": "run not found"}, HTTPStatus.NOT_FOUND)
-                return
-            self._send_json(document)
-            return
-        if parsed.path == "/api/schema":
+            else:
+                document = self.repository.get_run(key)
+                if document is None:
+                    self._send_json({"error": "run not found"}, HTTPStatus.NOT_FOUND)
+                else:
+                    self._send_json(document)
+        elif parsed.path == "/api/schema":
             schema_path = Path(__file__).with_name("schemas") / "result-v1.json"
             self._send_bytes(
                 schema_path.read_bytes(),
                 "application/schema+json; charset=utf-8",
             )
-            return
-        self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+        else:
+            self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
 
     def _send_json(
         self,
@@ -227,7 +225,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def log_message(self, format: str, *args: object) -> None:
+    def log_message(self, format_string: str, *args: object) -> None:
         return
 
 
@@ -267,10 +265,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     server = ThreadingHTTPServer((args.host, args.port), handler)
     url = f"http://{args.host}:{server.server_port}/"
-    print(f"Agent Debate Dashboard: {url}")
-    print("Roots:")
-    for root in repository.roots:
-        print(f"  {root}")
+    roots = "\n".join(f"  {root}" for root in repository.roots)
+    sys.stdout.write(f"Agent Debate Dashboard: {url}\nRoots:\n{roots}\n")
     if not args.no_browser:
         threading.Timer(0.25, lambda: webbrowser.open(url)).start()
     try:

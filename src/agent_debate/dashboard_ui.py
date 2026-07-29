@@ -1,5 +1,8 @@
 """Dependency-free local dashboard UI."""
 
+# The embedded HTML intentionally uses long template lines and Chinese UI punctuation.
+# ruff: noqa: E501, RUF001
+
 DASHBOARD_HTML = r"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -112,8 +115,52 @@ DASHBOARD_HTML = r"""<!doctype html>
     .decision .verdict { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; }
     .confidence { margin-left: auto; color: var(--muted); font-size: 13px; }
     .prose { color: #29453f; font: 16px/1.72 "Avenir Next", sans-serif; overflow-wrap: anywhere; }
+    .prose p { margin: 0 0 14px; }
+    .prose p:last-child { margin-bottom: 0; }
+    .prose ul { margin: 10px 0 0; padding-left: 22px; }
+    .prose li + li { margin-top: 8px; }
     .prose h1, .prose h2, .prose h3 { font-family: "Iowan Old Style", serif; line-height: 1.15; color: var(--ink); }
     .prose h2 { margin-top: 28px; }
+    .synthesis-layout { display: grid; gap: 24px; }
+    .synthesis-intro {
+      color: var(--muted); font-size: 12px; font-weight: 850;
+      letter-spacing: .09em; text-transform: uppercase;
+    }
+    .synthesis-ranking {
+      display: grid; gap: 0; margin: 0; padding: 0; list-style: none;
+      border-top: 1px solid var(--line);
+    }
+    .synthesis-rank {
+      display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px;
+      align-items: start; padding: 18px 0; border-bottom: 1px solid var(--line);
+    }
+    .synthesis-rank-no {
+      width: 42px; height: 42px; display: grid; place-items: center;
+      border-radius: 50%; color: var(--card); background: var(--ink);
+      font: 750 21px/1 "Iowan Old Style", serif;
+    }
+    .synthesis-rank:first-child .synthesis-rank-no { background: var(--accent); }
+    .synthesis-rank-body {
+      max-width: 980px; color: #29453f;
+      font: 650 clamp(16px, 1.25vw, 19px)/1.62 "Avenir Next", sans-serif;
+    }
+    .synthesis-boundaries {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;
+    }
+    .synthesis-boundary {
+      min-width: 0; padding: 14px 15px 15px; border: 1px solid var(--line);
+      border-radius: 11px; background: #faf6ec;
+    }
+    .synthesis-boundary strong {
+      display: block; margin-bottom: 7px; color: var(--accent);
+      font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    }
+    .synthesis-boundary span { color: #355049; font-size: 14px; line-height: 1.55; }
+    .synthesis-notes { display: grid; gap: 9px; }
+    .synthesis-note {
+      padding: 11px 13px; color: #3b524c; font-size: 14px; line-height: 1.6;
+      border-left: 3px solid var(--gold); border-radius: 0 8px 8px 0; background: #f7f1e5;
+    }
     .prose pre, .content-block {
       white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; color: #25433d;
       font: 13px/1.62 "SFMono-Regular", Consolas, monospace;
@@ -170,6 +217,8 @@ DASHBOARD_HTML = r"""<!doctype html>
       .metrics { grid-template-columns: repeat(2, 1fr); }
       .inv-sub { display: none; }
       .judge { margin-left: 0; }
+      .synthesis-rank { grid-template-columns: 38px minmax(0, 1fr); gap: 11px; }
+      .synthesis-rank-no { width: 34px; height: 34px; font-size: 17px; }
     }
   </style>
 </head>
@@ -233,6 +282,72 @@ DASHBOARD_HTML = r"""<!doctype html>
       if (list) out.push("</ul>");
       if (inCode) out.push("</code></pre>");
       return out.join("\n");
+    };
+    const inline = (value) => esc(value)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    const synthesis = (value) => {
+      const text = String(value || "").trim();
+      if (!text) return `<div style="color:var(--muted)">暂无最终结论</div>`;
+      if (/^(#{1,3}\s+|\s*[-*]\s+|\s*\d+[.)]\s+)/m.test(text)) return markdown(text);
+
+      const sentences = text.match(/[^\u3002\uFF01\uFF1F\n]+[\u3002\uFF01\uFF1F]?/gu)
+        ?.map(v => v.trim()).filter(Boolean) || [text];
+      const rankingIndex = sentences.findIndex(sentence => {
+        const markers = [...sentence.matchAll(/(\d{1,2})[\uFF09.)]\s*/g)];
+        return markers.length >= 2 && (markers[0].index || 0) < 80;
+      });
+      if (rankingIndex < 0) {
+        return `<div class="synthesis-layout">${sentences.map(sentence =>
+          `<p>${inline(sentence)}</p>`).join("")}</div>`;
+      }
+
+      const rankingSentence = sentences[rankingIndex];
+      const markers = [...rankingSentence.matchAll(/(\d{1,2})[\uFF09.)]\s*/g)];
+      const intro = rankingSentence.slice(0, markers[0].index)
+        .replace(/[\uFF1A:\uFF1B;\s]+$/u, "").trim();
+      const ranking = markers.map((marker, index) => {
+        const start = (marker.index || 0) + marker[0].length;
+        const end = markers[index + 1]?.index ?? rankingSentence.length;
+        return {
+          number: marker[1],
+          text: rankingSentence.slice(start, end)
+            .replace(/^[\uFF1B;\uFF0C,\s]+|[\uFF1B;\u3002.\s]+$/gu, "").trim(),
+        };
+      }).filter(item => item.text);
+
+      const remainder = sentences.filter((_, index) => index !== rankingIndex);
+      const boundaryIndex = remainder.findIndex(sentence =>
+        [...sentence.matchAll(/Top\s*(\d+)\s*(?:的)?\s*/gi)].length >= 2);
+      const boundaries = boundaryIndex < 0 ? [] : (() => {
+        const sentence = remainder[boundaryIndex];
+        const matches = [...sentence.matchAll(/Top\s*(\d+)\s*(?:的)?\s*/gi)];
+        return matches.map((match, index) => {
+          const start = (match.index || 0) + match[0].length;
+          const end = matches[index + 1]?.index ?? sentence.length;
+          return {
+            number: match[1],
+            text: sentence.slice(start, end)
+              .replace(/^[\uFF1A:\uFF1B;\uFF0C,\s]+|[\uFF1B;\u3002.\s]+$/gu, "")
+              .trim(),
+          };
+        }).filter(item => item.text);
+      })();
+      const notes = remainder.filter((_, index) => index !== boundaryIndex);
+
+      return `<div class="synthesis-layout">
+        ${intro ? `<div class="synthesis-intro">${inline(intro)}</div>` : ""}
+        <ol class="synthesis-ranking">${ranking.map(item => `
+          <li class="synthesis-rank">
+            <span class="synthesis-rank-no">${esc(item.number)}</span>
+            <span class="synthesis-rank-body">${inline(item.text)}</span>
+          </li>`).join("")}</ol>
+        ${boundaries.length ? `<div class="synthesis-boundaries">${boundaries.map(item => `
+          <div class="synthesis-boundary"><strong>Top ${esc(item.number)} · 验证边界</strong>
+            <span>${inline(item.text)}</span></div>`).join("")}</div>` : ""}
+        ${notes.length ? `<div class="synthesis-notes">${notes.map(note =>
+          `<div class="synthesis-note">${inline(note)}</div>`).join("")}</div>` : ""}
+      </div>`;
     };
     const status = (s) => `<span class="status ${esc(s)}">${esc(s || "unknown")}</span>`;
 
@@ -360,7 +475,9 @@ DASHBOARD_HTML = r"""<!doctype html>
           <div class="grid"><div>
             <div class="card decision"><div class="verdict">${status(decision.verdict || run.status)}
               <span class="confidence">${esc(run.stop_reason || "")}</span></div>
-              <h3>最终综合</h3><div class="prose">${markdown(decision.synthesis || doc.summary?.final_markdown || "暂无最终结论")}</div></div>
+              <h3>最终综合</h3><div class="prose">
+                ${synthesis(decision.synthesis || doc.summary?.final_markdown)}
+              </div></div>
             <div class="card"><h3>接受的决定</h3>${items(decision.accepted_decisions)}</div>
             <div class="card"><h3>拒绝的选项</h3>${items(decision.rejected_options)}</div>
           </div><aside>
