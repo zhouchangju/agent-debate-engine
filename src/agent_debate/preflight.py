@@ -25,15 +25,19 @@ _BUILTIN_EXECUTABLES = {
     "codex": "codex",
     "kimi": "kimi",
 }
+_CODEX_VERSION_PATTERN = re.compile(
+    r"\Acodex-cli (?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)"
+    r"(?:[-+][0-9A-Za-z.-]+)?\Z"
+)
+_CODEX_MINIMUM_VERSION = (0, 145, 0)
+_CODEX_SUPPORTED_MAJOR = 0
+_CODEX_VERIFIED_MINORS = frozenset({(0, 145), (0, 146)})
+_CODEX_VERSION_DESCRIPTION = "codex-cli >=0.145.0,<1.0.0"
 _BUILTIN_VERSION_PATTERNS = {
-    # The adapter contract is tied to the 0.145 CLI surface. Patch releases
-    # retain the same provider-owned argv contract.
-    "codex": re.compile(r"\Acodex-cli 0\.145\.\d+(?:[-+][0-9A-Za-z.-]+)?\Z"),
     # Kimi's permission behavior was verified against this exact release.
     "kimi": re.compile(r"\A0\.29\.1\Z"),
 }
 _BUILTIN_VERSION_DESCRIPTIONS = {
-    "codex": "codex-cli 0.145.x",
     "kimi": "Kimi 0.29.1 (version output 0.29.1)",
 }
 
@@ -189,7 +193,36 @@ def _validate_preflight_command(adapter: str, command: Sequence[str]) -> None:
     _validate_builtin_command(adapter, command)
 
 
-def _validate_builtin_version(adapter: str, version: str) -> None:
+def _validate_codex_version(version: str) -> tuple[str, ...]:
+    match = _CODEX_VERSION_PATTERN.fullmatch(version)
+    if match is None:
+        raise PreflightError(
+            f"Unsupported codex version response {version!r}; expected {_CODEX_VERSION_DESCRIPTION}"
+        )
+
+    parsed = tuple(int(match.group(name)) for name in ("major", "minor", "patch"))
+    if parsed[0] != _CODEX_SUPPORTED_MAJOR or parsed < _CODEX_MINIMUM_VERSION:
+        raise PreflightError(
+            f"Unsupported codex version response {version!r}; expected {_CODEX_VERSION_DESCRIPTION}"
+        )
+
+    minor = (parsed[0], parsed[1])
+    if minor not in _CODEX_VERIFIED_MINORS:
+        verified = ", ".join(
+            f"{major}.{minor_version}.x" for major, minor_version in sorted(_CODEX_VERIFIED_MINORS)
+        )
+        return (
+            f"{version} is newer than the locally verified Codex releases ({verified}); "
+            "continuing within the supported 0.x contract. Run doctor after upgrades and "
+            "inspect the first debate result.",
+        )
+    return ()
+
+
+def _validate_builtin_version(adapter: str, version: str) -> tuple[str, ...]:
+    if adapter == "codex":
+        return _validate_codex_version(version)
+
     pattern = _BUILTIN_VERSION_PATTERNS[adapter]
     if pattern.fullmatch(version) is None:
         expected = _BUILTIN_VERSION_DESCRIPTIONS[adapter]
@@ -197,6 +230,7 @@ def _validate_builtin_version(adapter: str, version: str) -> None:
             f"Unsupported {adapter} version response {version!r}; "
             f"expected the verified {expected} contract"
         )
+    return ()
 
 
 async def diagnose_agents(
@@ -263,7 +297,7 @@ async def diagnose_agents(
                 cwd=working_directory,
                 timeout_seconds=probe_timeout_seconds,
             )
-            _validate_builtin_version(adapter, version)
+            warnings.extend(_validate_builtin_version(adapter, version))
         except PreflightError as exc:
             diagnostics.append(
                 AgentDiagnostic(

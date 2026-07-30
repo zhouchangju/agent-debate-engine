@@ -218,20 +218,22 @@ deadline across crashes.
 
 ## Locally verified CLI surface
 
-On 2026-07-26, local `--version` and `--help` checks used:
+Local `--version` and `--help` checks on 2026-07-26 and 2026-07-30 used:
 
 ```text
 codex-cli 0.145.0
+codex-cli 0.146.0
 0.29.1
 ```
 
 No real model call was needed for that compatibility check. CLI behavior, flags, default models,
 and provider policies can change; run `agent-debate doctor` after upgrades. Doctor runs a bounded
-`--version` probe only for the allowlisted built-in executable names and rejects an unexpected
-product/version response. It never runs a configured generic command, because arbitrary CLIs do
-not share a side-effect-free version contract; generic diagnostics are limited to executable
-resolution and permission checks. These observations are evidence about one machine, not a blanket
-security certification.
+`--version` probe only for the allowlisted built-in executable names. Codex `0.x` releases from
+`0.145.0` onward are accepted, with a warning beyond the locally verified `0.146.x` surface; a new
+major version still fails closed because sandbox semantics may change. Doctor never runs a
+configured generic command, because arbitrary CLIs do not share a side-effect-free version
+contract; generic diagnostics are limited to executable resolution and permission checks. These
+observations are evidence about one machine, not a blanket security certification.
 
 ## Deployment checklist
 

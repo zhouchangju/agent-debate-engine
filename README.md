@@ -45,11 +45,21 @@ agent-debate run --config debate.yaml "Design a durable agent memory subsystem"
 The `debate` command is an alias for `agent-debate`.
 
 `init` writes an editable `debate.yaml` and role prompts. The bundled template defaults Codex to
-`gpt-5.6-sol` (model `gpt-5.6-sol`) with `model_reasoning_effort: medium`, and each agent runs
-under `read_only`. Every run receives a
+model `gpt-5.6-sol` with `model_reasoning_effort: medium`, and each agent runs under `read_only`.
+Every run receives a
 collision-safe directory below
 `.agent-debate/runs/`. Initialization never follows a symbolic link in the destination path: the
 destination and every existing ancestor must be real directories.
+
+## Configure local agent runtimes
+
+Agent profiles in `debate.yaml` determine which local CLI runs each debate role. The engine has
+built-in contracts for Codex and Kimi, plus a Generic adapter for other argv-based agent CLIs.
+
+Start with the [agent runtime configuration guide](docs/agent-runtimes.md). It contains copyable
+Codex, Kimi, and Generic examples; model and reasoning-effort settings; role mapping; validation
+commands; and the permission differences that affect how a run must be contained. The exhaustive
+field reference remains in [configuration.md](docs/configuration.md).
 
 ## Natural-language Skill
 
@@ -101,6 +111,21 @@ validate + preflight
         └── otherwise ───────────────────────────► next round / exhausted
 ```
 
+In the generated technical-review workflow, `Architect` and `Alternative` are separate provider
+invocations built from the same pre-stage evidence set. They share the task and prior-round
+evidence candidates, subject to each prompt's context budget, but receive different role prompts
+and cannot see each other's current-round response.
+Only after both proposal calls reach the stage barrier does `Critic` receive both proposals.
+`Reviewer` then receives the proposals plus the critique, and the Judge receives every
+current-round output.
+
+Reusing an agent profile later in the workflow does not resume a hidden conversation: each
+participant is a new invocation whose context is assembled explicitly by the engine. Participants
+may inspect the same configured workspace, but their prompt contexts remain separate. If the Judge
+requests another round, both proposal roles receive the Judge ledger, open issues, next-round
+focus, and eligible bounded prior-round evidence, then produce their new proposals independently
+again.
+
 The Judge reports a verdict, confidence, current synthesis, accepted decisions, rejected options,
 and unresolved issues. The engine—not the model—decides whether the configured stopping conditions
 are satisfied. Reaching the round limit without convergence produces an explicit `exhausted` run;
@@ -127,7 +152,7 @@ The built-in contracts were verified locally against:
 
 | Adapter | Verified CLI | Prompt transport | Supported permission |
 |---|---|---|---|
-| Codex | `codex-cli 0.145.0` | stdin to `codex exec ... -` | `read_only`, `workspace_write`, or `danger_full_access`; approvals denied |
+| Codex | `>=0.145.0,<1.0.0` (`0.145.x`–`0.146.x` verified) | stdin to `codex exec ... -` | `read_only`, `workspace_write`, or `danger_full_access`; approvals denied |
 | Kimi | `kimi 0.29.1` | `--prompt` argument | `danger_full_access` only |
 | Generic | user-defined argv | stdin, argument, or flag | externally enforced; always unsafe to the engine |
 
@@ -136,11 +161,13 @@ configuration, and permission argv. Configuration cannot override those controls
 `extra_args`. A generic executable has no portable, engine-enforceable sandbox contract, so every
 generic profile requires `--allow-unsafe` regardless of its declared permission and cannot
 participate in a parallel stage. Run generic commands inside an externally enforced sandbox.
+See [Configuring agent runtimes](docs/agent-runtimes.md) for setup examples.
 
-`doctor` executes `--version` only for allowlisted built-in executable names and rejects version
-responses outside the verified adapter contract. It never executes a generic command: for generic
-profiles it checks only that the executable can be resolved and executed, then reports that no
-portable side-effect-free version probe exists.
+`doctor` executes `--version` only for allowlisted built-in executable names. Codex releases from
+`0.145.0` through the remaining `0.x` line are accepted; releases newer than the locally verified
+`0.146.x` surface produce a warning, while older or new-major releases fail closed. It never
+executes a generic command: for generic profiles it checks only that the executable can be resolved
+and executed, then reports that no portable side-effect-free version probe exists.
 
 Kimi 0.29.1 headless `--prompt` mode creates or resumes a session with permission `auto` and
 auto-approves tool calls. The same CLI rejects combining `--prompt` with `--plan`, `--yolo`, or

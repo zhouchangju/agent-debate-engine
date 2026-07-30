@@ -48,12 +48,14 @@ The built-in surface was locally inspected with:
 
 ```text
 codex-cli 0.145.0
+codex-cli 0.146.0
 0.29.1
 ```
 
 Local CLI contracts and Kimi's installed bundled source were checked; no real model call was
-required. This is honest compatibility evidence for one environment, not a promise about all CLI
-releases.
+required. Codex `0.x` releases from `0.145.0` onward are accepted, while releases beyond the
+locally verified `0.146.x` surface emit a warning. This is honest compatibility evidence for one
+environment, not a promise about all CLI releases.
 
 Kimi 0.29.1 documents prompt mode through `--prompt`, so the adapter uses argv, redacts the prompt
 from displayed commands, and enforces a conservative UTF-8 byte ceiling. The installed bundle

@@ -9,7 +9,6 @@ description: >-
   debate, or says phrases such as 多 Agent 讨论、让几个 AI 评审、开一轮辩论、方案对抗、
   独立提出方案再裁决. Ordinary single-agent analysis without explicit multi-agent
   execution intent must not silently launch paid provider calls.
-compatibility: Python 3.11+, agent-debate-engine, Codex CLI 0.145.x, POSIX
 ---
 
 # Agent Debate
@@ -91,6 +90,12 @@ resume, or unexpected runner response.
 If `agent-debate-engine` or the supported Codex CLI is unavailable, report the
 missing dependency and the smallest setup action. Do not claim that a debate
 ran. Do not replace the engine with an improvised single-model role-play.
+
+Codex preflight accepts `0.145.0` or newer within the `0.x` command-contract
+family. Releases `0.145.x` and `0.146.x` are locally verified; newer `0.x`
+releases continue with a warning so routine CLI upgrades do not block the
+Skill. A new major version remains fail-closed until its sandbox and argv
+contract are reviewed.
 
 ## Verify and present the result
 

@@ -46,6 +46,38 @@ well-supported round and is capped at three by default. Higher-assurance deploym
 Parallel results are persisted under participant IDs and presented to later stages in deterministic
 workflow order, not completion order. `run.max_parallel` is the global concurrency ceiling.
 
+### Context visibility and isolation
+
+Every participant is a separate provider invocation. An agent profile defines adapter, model,
+permission, and process settings; it is not a persistent chat session. The orchestrator constructs
+each invocation's prompt explicitly from the task, role prompt, Judge state, and eligible debate
+evidence.
+
+The generated technical-review workflow exposes evidence as follows:
+
+| Invocation | Current-round evidence visible at start | Current-round evidence not visible |
+|---|---|---|
+| `Architect` | none | `Alternative` and all later-stage outputs |
+| `Alternative` | none | `Architect` and all later-stage outputs |
+| `Critic` | both completed proposals | `Reviewer` and the Judge |
+| `Reviewer` | both proposals and the critique | the Judge |
+| Judge | all proposal, critique, and revision outputs | none |
+
+The two proposal prompts are frozen from the same pre-stage evidence before either provider
+result is available. Their role prompts differ, but neither proposal can react to the other's
+current-round answer. The proposal barrier prevents `Critic` from observing a partial proposal
+stage, and later barriers apply the same rule to `Reviewer` and the Judge.
+
+Context isolation is not a separate filesystem namespace. Invocations use the configured workspace
+and permission boundary, while their conversational evidence is isolated by separately assembled
+prompts. Reusing `codex_primary` for `Architect`, `Critic`, and the Judge, for example, does not
+implicitly carry private conversation state between those calls.
+
+On a later round, both proposal roles are offered the same prior-round evidence set, subject to
+each prompt's context budget, plus the last Judge ledger, unresolved issues, and next-round focus.
+They then run independently again. This creates role and context diversity, not independent ground
+truth, especially when multiple roles use the same provider or model.
+
 ## Components
 
 ### Natural-language control plane
@@ -109,10 +141,11 @@ Models are not hardcoded in the template. Omitting `model` delegates model selec
 local configuration. A deployment that needs a pinned model can set it explicitly, but must then
 own alias availability and version drift.
 
-The local compatibility checks for this implementation used `codex-cli 0.145.0` and `kimi 0.29.1`.
-They covered CLI output and the installed Kimi bundle's headless permission behavior; they are not
-a claim that every earlier or later CLI version behaves identically. Preflight fails closed when a
-built-in product/version leaves its verified contract. Generic preflight never executes the
+The local compatibility checks for this implementation used `codex-cli 0.145.0`,
+`codex-cli 0.146.0`, and `kimi 0.29.1`. They covered CLI output and the installed Kimi bundle's
+headless permission behavior; they are not a claim that every earlier or later CLI version behaves
+identically. Codex preflight accepts `>=0.145.0,<1.0.0`, warns beyond the locally verified
+`0.146.x` surface, and fails closed on a new major version. Generic preflight never executes the
 configured command and therefore reports no version.
 
 ### Context builder

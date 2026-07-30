@@ -27,6 +27,9 @@ All notable changes to this project are documented here. The format follows
 ### Fixed
 
 - Dashboard lint and strict-mypy failures that kept every public quality-matrix job red.
+- Codex preflight now accepts routine `0.x` upgrades from `0.145.0` onward, verifies the current
+  `0.146.x` contract, warns on newer unverified minors, and retains a fail-closed major-version
+  boundary.
 
 ## [0.1.0] - 2026-07-26
 

@@ -309,10 +309,12 @@ The built-in command contracts were checked on the development machine with:
 
 ```text
 codex-cli 0.145.0
+codex-cli 0.146.0
 0.29.1
 ```
 
 The check inspected local CLI output and, for Kimi's headless permission behavior, the installed
-bundled source. It did not make real model calls and does not establish compatibility with every
-CLI release. Run `agent-debate doctor --config debate.yaml` in the target environment before
-spending tokens.
+bundled source. Codex preflight accepts `>=0.145.0,<1.0.0`; versions newer than the locally
+verified `0.146.x` surface continue with a warning. It did not make real model calls and does not
+establish compatibility with every CLI release. Run `agent-debate doctor --config debate.yaml` in
+the target environment before spending tokens.

@@ -77,7 +77,7 @@ def _use_fixture_adapter(
                 agent_id="fixture",
                 adapter="codex",
                 executable=Path(sys.executable),
-                version="codex-cli 0.145.0",
+                version="codex-cli 0.146.0",
                 ok=True,
             )
         ]

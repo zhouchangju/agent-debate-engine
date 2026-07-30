@@ -247,13 +247,61 @@ async def test_builtin_version_probe_failure_is_unhealthy(tmp_path: Path) -> Non
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("reported_version", "expected_error"),
+    "reported_version",
     [
-        ("not-codex 0.145.0", "Unsupported codex version response"),
-        ("codex-cli 0.146.0", "expected the verified codex-cli 0.145.x contract"),
+        "codex-cli 0.145.0",
+        "codex-cli 0.146.0",
+        "codex-cli 0.146.7+standalone",
     ],
 )
-async def test_builtin_version_contract_fails_closed(
+async def test_supported_codex_version_contract_is_healthy(
+    tmp_path: Path,
+    reported_version: str,
+) -> None:
+    executable = _write_executable(
+        tmp_path / "codex",
+        f"printf '{reported_version}\\n'\n",
+    )
+
+    diagnostics = await diagnose_agents(
+        {"codex": FakeConfig("codex", [str(executable)])},
+        cwd=tmp_path,
+    )
+
+    assert diagnostics[0].ok
+    assert diagnostics[0].version == reported_version
+    assert diagnostics[0].error is None
+    assert not diagnostics[0].warnings
+
+
+@pytest.mark.asyncio
+async def test_newer_codex_zero_major_version_is_healthy_with_warning(tmp_path: Path) -> None:
+    executable = _write_executable(
+        tmp_path / "codex",
+        "printf 'codex-cli 0.147.0\\n'\n",
+    )
+
+    diagnostics = await diagnose_agents(
+        {"codex": FakeConfig("codex", [str(executable)])},
+        cwd=tmp_path,
+    )
+
+    assert diagnostics[0].ok
+    assert diagnostics[0].version == "codex-cli 0.147.0"
+    assert diagnostics[0].error is None
+    assert any("newer than the locally verified" in item for item in diagnostics[0].warnings)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("reported_version", "expected_error"),
+    [
+        ("not-codex 0.146.0", "Unsupported codex version response"),
+        ("codex-cli 0.144.9", "codex-cli >=0.145.0,<1.0.0"),
+        ("codex-cli 1.0.0", "codex-cli >=0.145.0,<1.0.0"),
+    ],
+)
+async def test_unsupported_codex_version_contract_fails_closed(
     tmp_path: Path,
     reported_version: str,
     expected_error: str,

@@ -1,4 +1,4 @@
-"""Codex CLI 0.145 adapter."""
+"""Codex CLI adapter for the supported 0.x command contract."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ _CODEX_SANDBOX = {
 
 
 class CodexAdapter(BaseAdapter):
-    """Build and run a non-interactive Codex CLI 0.145 invocation."""
+    """Build and run a non-interactive Codex CLI invocation."""
 
     name = "codex"
 
